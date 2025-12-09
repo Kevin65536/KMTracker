@@ -60,8 +60,24 @@ class Database:
             # Migration for new columns in app_stats
             self._migrate_app_stats_schema()
             
+            # Hourly App Stats table for granular tracking
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS hourly_app_stats (
+                    date DATE,
+                    hour INTEGER,
+                    app_name TEXT,
+                    key_count INTEGER DEFAULT 0,
+                    clicks INTEGER DEFAULT 0,
+                    scrolls INTEGER DEFAULT 0,
+                    distance REAL DEFAULT 0.0,
+                    PRIMARY KEY (date, hour, app_name)
+                )
+            ''')
+            
             # Ensure app_metadata table exists
             self._migrate_app_metadata_schema()
+            
+            conn.commit()
 
     def _migrate_app_stats_schema(self):
         """Add new columns to app_stats if they don't exist."""
@@ -108,6 +124,20 @@ class Database:
                     scrolls = scrolls + excluded.scrolls,
                     distance = distance + excluded.distance
             ''', (date, app_name, key_count, click_count, scroll_count, distance))
+            conn.commit()
+
+    def update_hourly_app_stats(self, date, hour, app_name, key_count=0, clicks=0, scrolls=0, distance=0.0):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO hourly_app_stats (date, hour, app_name, key_count, clicks, scrolls, distance)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, hour, app_name) DO UPDATE SET
+                    key_count = key_count + excluded.key_count,
+                    clicks = clicks + excluded.clicks,
+                    scrolls = scrolls + excluded.scrolls,
+                    distance = distance + excluded.distance
+            ''', (date, hour, app_name, key_count, clicks, scrolls, distance))
             conn.commit()
 
     def update_heatmap(self, date, key_code, count):
@@ -291,24 +321,136 @@ class Database:
                 ''', (limit,))
             return cursor.fetchall()
 
-    def get_daily_history(self, start_date=None, end_date=None):
+    def get_daily_history(self, start_date=None, end_date=None, app_filter=None):
         """Get daily statistics for trend charts. Returns list of (date, keys, clicks, distance, scroll)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            if start_date and end_date:
+            
+            if app_filter and app_filter != "All Applications":
+                if start_date and end_date:
+                    cursor.execute('''
+                        SELECT date, SUM(key_count), SUM(clicks), SUM(distance), SUM(scrolls)
+                        FROM app_stats 
+                        WHERE app_name = ? AND date BETWEEN ? AND ?
+                        GROUP BY date
+                        ORDER BY date ASC
+                    ''', (app_filter, start_date, end_date))
+                else:
+                    cursor.execute('''
+                        SELECT date, SUM(key_count), SUM(clicks), SUM(distance), SUM(scrolls)
+                        FROM app_stats 
+                        WHERE app_name = ?
+                        GROUP BY date
+                        ORDER BY date ASC
+                    ''', (app_filter,))
+            else:
+                if start_date and end_date:
+                    cursor.execute('''
+                        SELECT date, key_count, mouse_click_count, mouse_distance, scroll_distance
+                        FROM daily_stats 
+                        WHERE date BETWEEN ? AND ?
+                        ORDER BY date ASC
+                    ''', (start_date, end_date))
+                else:
+                    cursor.execute('''
+                        SELECT date, key_count, mouse_click_count, mouse_distance, scroll_distance
+                        FROM daily_stats 
+                        ORDER BY date ASC
+                    ''')
+            return cursor.fetchall()
+
+    def get_today_hourly_stats(self, app_filter=None):
+        """Get today's hourly stats: [(hour, keys, clicks), ...]"""
+        today = datetime.date.today()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
                 cursor.execute('''
-                    SELECT date, key_count, mouse_click_count, mouse_distance, scroll_distance
-                    FROM daily_stats 
-                    WHERE date BETWEEN ? AND ?
-                    ORDER BY date ASC
-                ''', (start_date, end_date))
+                    SELECT hour, SUM(key_count), SUM(clicks)
+                    FROM hourly_app_stats
+                    WHERE date = ? AND app_name = ?
+                    GROUP BY hour
+                    ORDER BY hour ASC
+                ''', (today, app_filter))
             else:
                 cursor.execute('''
-                    SELECT date, key_count, mouse_click_count, mouse_distance, scroll_distance
-                    FROM daily_stats 
-                    ORDER BY date ASC
+                    SELECT hour, SUM(key_count), SUM(clicks)
+                    FROM hourly_app_stats
+                    WHERE date = ?
+                    GROUP BY hour
+                    ORDER BY hour ASC
+                ''', (today,))
+            return cursor.fetchall()
+
+    def get_day_of_week_averages(self, app_filter=None):
+        """Get average stats per day of week (0=Sunday, 6=Saturday in SQLite strftime %w)."""
+        # Note: SQLite %w returns 0-6 where 0 is Sunday.
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
+                # Average per day for specific app involves summing for each date then averaging by DOW
+                # But querying raw app_stats is easier:
+                cursor.execute('''
+                    SELECT 
+                        strftime('%w', date) as dow,
+                        AVG(key_count),
+                        AVG(clicks)
+                    FROM app_stats
+                    WHERE app_name = ?
+                    GROUP BY dow
+                    ORDER BY dow
+                ''', (app_filter,))
+            else:
+                cursor.execute('''
+                    SELECT 
+                        strftime('%w', date) as dow,
+                        AVG(key_count),
+                        AVG(mouse_click_count)
+                    FROM daily_stats
+                    GROUP BY dow
+                    ORDER BY dow
                 ''')
             return cursor.fetchall()
+
+    def get_hour_of_day_averages(self, app_filter=None):
+        """Get average stats per hour of day over history."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT hour, AVG(key_count), AVG(clicks)
+                    FROM hourly_app_stats
+                    WHERE app_name = ?
+                    GROUP BY hour
+                    ORDER BY hour
+                ''', (app_filter,))
+            else:
+                # Sum all apps for each (date, hour) first, then average?
+                # Or just average over all (date, hour) records? 
+                # Be careful: hourly_app_stats has one row per app per hour.
+                # To get global hourly average, we first need to sum across apps for each (date, hour), then average those sums.
+                cursor.execute('''
+                    WITH hourly_sums AS (
+                        SELECT date, hour, SUM(key_count) as total_keys, SUM(clicks) as total_clicks
+                        FROM hourly_app_stats
+                        GROUP BY date, hour
+                    )
+                    SELECT hour, AVG(total_keys), AVG(total_clicks)
+                    FROM hourly_sums
+                    GROUP BY hour
+                    ORDER BY hour
+                ''')
+            return cursor.fetchall()
+
+    def get_all_apps(self):
+        """Get list of all unique app names for dropdown."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Try to return friendly names if available, else app_name
+            # But grouping is by app_name. UI can look up friendly name.
+            # Let's just return app_name sorted.
+            cursor.execute('SELECT DISTINCT app_name FROM app_stats ORDER BY app_name')
+            return [row[0] for row in cursor.fetchall()]
 
     def _migrate_app_metadata_schema(self):
         with self.get_connection() as conn:

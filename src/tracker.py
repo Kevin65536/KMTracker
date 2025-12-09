@@ -454,11 +454,20 @@ class InputTracker:
                 self.scroll_buffer
             )
             
+            current_hour = datetime.datetime.now().hour
             for app, stats in self.app_stats_buffer.items():
                 self.db.update_app_stats(today, app, 
                     key_count=stats['keys'], 
                     click_count=stats['clicks'],
                     scroll_count=stats['scrolls'],
+                    distance=stats['distance']
+                )
+                
+                # Granular hourly stats
+                self.db.update_hourly_app_stats(today, current_hour, app,
+                    key_count=stats['keys'], 
+                    clicks=stats['clicks'],
+                    scrolls=stats['scrolls'],
                     distance=stats['distance']
                 )
             
