@@ -182,10 +182,11 @@ class MouseHeatmapWidget(QWidget):
         if not screens:
             return []
             
-        # Sort screens: Top-Left dominant. Sort by Y then X? 
-        # Usually users want Left-to-Right.
-        # Let's simple sort by X coordinate.
+        # Sort screens by X to determine left-to-right order for packing
         sorted_screens = sorted(screens, key=lambda s: s.geometry().x())
+        
+        # Determine global min_y to normalize vertical positions
+        min_y = min(s.geometry().y() for s in screens)
         
         layout = []
         current_x = 0
@@ -193,19 +194,12 @@ class MouseHeatmapWidget(QWidget):
         
         for screen in sorted_screens:
             geom = screen.geometry()
-            # We place them in a row for now (simple compaction)
-            # Improving this to strictly respect relative Y positions while closing X gaps is complex.
-            # Simplified approach: Respect relative Y, but pack X.
             
-            # Find the "min x" in the group to normalize?
-            # Actually, "closing the gap" implies we just want them side-by-side if they are side-by-side.
-            # Visualizing the Wall:
-            # Shift everything left until it hits another screen or origin?
-            # Simple approach: Linear row packing.
-            # Used for Reference Style: Just show them side-by-side.
+            # Pack X (compact them side-by-side)
+            # Preserve Y relative to the bounding box top (geom.y() - min_y)
+            # This respects the user's vertical alignment (e.g. one screen higher than another)
+            packed_rect = QRect(current_x, geom.y() - min_y, geom.width(), geom.height())
             
-            # Pack X:
-            packed_rect = QRect(current_x, 0, geom.width(), geom.height())
             layout.append({
                 'screen': screen,
                 'packed_rect': packed_rect,
