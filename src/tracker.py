@@ -1,5 +1,6 @@
 import threading
 import time
+import os
 import math
 import ctypes
 from ctypes import wintypes
@@ -194,12 +195,109 @@ class InputTracker:
             'buffer_heatmap': buffer_heatmap
         }
 
-    def get_active_app_name(self):
+    def get_active_app_info(self):
+        """Returns (app_name, exe_path, pid)."""
         try:
             hwnd = win32gui.GetForegroundWindow()
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             process = psutil.Process(pid)
-            return process.name()
+            
+            try:
+                name = process.name()
+            except Exception as e:
+                try:
+                    case_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tracker_error.log")
+                    with open(case_path, "a") as f:
+                        f.write(f"{datetime.datetime.now()} - Error in process.name(): {e}\n")
+                except:
+                    pass
+                name = "Unknown"
+                
+            try:
+                exe = process.exe()
+            except (psutil.AccessDenied, Exception):
+                exe = None
+                
+            return name, exe, pid
+        except Exception as e:
+            # Debug logging to file
+            try:
+                case_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tracker_error.log")
+                with open(case_path, "a") as f:
+                    import traceback
+                    f.write(f"{datetime.datetime.now()} - Error in get_active_app_info: {e}\n")
+                    f.write(traceback.format_exc())
+                    f.write("\n")
+            except:
+                pass
+            return "Unknown", None, None
+
+    def get_file_description(self, path):
+        """Extract FileDescription from PE file using win32api."""
+        if not path or not os.path.exists(path):
+            return None
+        try:
+            # Get language/codepage pairs
+            lang_info = win32api.GetFileVersionInfo(path, '\\VarFileInfo\\Translation')
+            if not lang_info:
+                return None
+            
+            # Construct the query string for the first language/codepage
+            lang, codepage = lang_info[0]
+            # Format: \StringFileInfo\040904B0\FileDescription
+            query = f'\\StringFileInfo\\{lang:04x}{codepage:04x}\\FileDescription'
+            
+            return win32api.GetFileVersionInfo(path, query)
+        except Exception:
+            return None
+
+    def _check_update_metadata(self, app_name, exe_path):
+        """Update DB with metadata if we haven't seen this app yet."""
+        if app_name == "Unknown": return
+        
+        # Simple cache to avoid re-querying DB/File every frame
+        if hasattr(self, 'metadata_cache') and app_name in self.metadata_cache:
+            return
+
+        if not hasattr(self, 'metadata_cache'):
+            self.metadata_cache = set()
+
+        friendly_name = self.get_file_description(exe_path)
+        if not friendly_name:
+            friendly_name = app_name # Fallback
+            
+        # Strip .exe if fallback
+        if friendly_name == app_name and friendly_name.lower().endswith('.exe'):
+            friendly_name = friendly_name[:-4]
+            # Capitalize?
+            friendly_name = friendly_name.capitalize()
+            
+        try:
+            self.db.update_app_metadata(app_name, friendly_name, exe_path)
+            self.metadata_cache.add(app_name)
+        except Exception:
+            pass
+
+    def get_active_app_name(self):
+        # Wraps the detailed version for backward compatibility if needed, 
+        # but better to integrate the metadata check here or in OnMove.
+        try:
+            name, path, _ = self.get_active_app_info()
+            
+            # Trace logging
+            try:
+                if not hasattr(self, 'trace_cache'): self.trace_cache = set()
+                if name not in self.trace_cache:
+                    case_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_trace.txt")
+                    with open(case_path, "a") as f:
+                        f.write(f"{datetime.datetime.now()} - Detected: {name} (Path: {path})\n")
+                    self.trace_cache.add(name)
+            except:
+                pass
+
+            if name != "Unknown":
+                self._check_update_metadata(name, path)
+            return name
         except Exception:
             return "Unknown"
 

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, 
-                                 QTableWidgetItem, QHeaderView, QLabel)
-from PySide6.QtCore import Qt
+                                 QTableWidgetItem, QHeaderView, QLabel, QFileIconProvider)
+from PySide6.QtCore import Qt, QFileInfo
 
 class AppStatsWidget(QWidget):
     def __init__(self):
@@ -54,14 +54,37 @@ class AppStatsWidget(QWidget):
         
         layout.addWidget(self.table)
         
-    def update_data(self, data):
-        """Update table with list of tuples: (app_name, keys, clicks, scrolls, distance)"""
+    def update_data(self, data, metadata=None):
+        """
+        Update table with list of tuples: (app_name, keys, clicks, scrolls, distance)
+        metadata: dict {app_name: {'friendly_name': str, 'exe_path': str}}
+        """
+        metadata = metadata or {}
+        icon_provider = QFileIconProvider()
+        
         self.table.setSortingEnabled(False) # Disable sorting while updating
         self.table.setRowCount(len(data))
         
         for row, (app, keys, clicks, scrolls, dist) in enumerate(data):
-            # App Name
-            name_item = QTableWidgetItem(str(app))
+            # Resolve Metadata
+            friendly_name = app
+            exe_path = None
+            if app in metadata:
+                meta = metadata[app]
+                friendly_name = meta.get('friendly_name') or app
+                exe_path = meta.get('exe_path')
+            
+            # App Name Item with Icon
+            name_item = QTableWidgetItem(str(friendly_name))
+            
+            # Load Icon
+            if exe_path:
+                info = QFileInfo(exe_path)
+                icon = icon_provider.icon(info)
+                if not icon.isNull():
+                    name_item.setIcon(icon)
+            
+            name_item.setToolTip(app) # Show real exe name on hover
             self.table.setItem(row, 0, name_item)
             
             # Keys

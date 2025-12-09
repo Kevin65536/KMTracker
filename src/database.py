@@ -59,6 +59,9 @@ class Database:
             
             # Migration for new columns in app_stats
             self._migrate_app_stats_schema()
+            
+            # Ensure app_metadata table exists
+            self._migrate_app_metadata_schema()
 
     def _migrate_app_stats_schema(self):
         """Add new columns to app_stats if they don't exist."""
@@ -306,3 +309,53 @@ class Database:
                     ORDER BY date ASC
                 ''')
             return cursor.fetchall()
+
+    def _migrate_app_metadata_schema(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS app_metadata (
+                    app_name TEXT PRIMARY KEY,
+                    friendly_name TEXT,
+                    exe_path TEXT
+                )
+            ''')
+            conn.commit()
+
+    def update_app_metadata(self, app_name, friendly_name, exe_path):
+        """Update or insert app metadata."""
+        # Ensure schema exists (lazy init or call in init_db)
+        # Calling here is safe but a bit redundant, usually call in init_db.
+        # But since we are patching, let's call it once in init_db or here.
+        # Let's add it to init_db actually, but since I am editing here...
+        # I'll rely on init_db calling it if I add it there, or just call it.
+        # Let's just execute the create if not exists here to be safe for this patch.
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS app_metadata (
+                    app_name TEXT PRIMARY KEY,
+                    friendly_name TEXT,
+                    exe_path TEXT
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO app_metadata (app_name, friendly_name, exe_path)
+                VALUES (?, ?, ?)
+                ON CONFLICT(app_name) DO UPDATE SET
+                    friendly_name = excluded.friendly_name,
+                    exe_path = excluded.exe_path
+            ''', (app_name, friendly_name, exe_path))
+            conn.commit()
+
+    def get_app_metadata_dict(self):
+        """Return dict {app_name: {'friendly_name': ..., 'exe_path': ...}}."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Check table exists first
+            try:
+                cursor.execute("SELECT app_name, friendly_name, exe_path FROM app_metadata")
+                rows = cursor.fetchall()
+                return {row[0]: {'friendly_name': row[1], 'exe_path': row[2]} for row in rows}
+            except sqlite3.OperationalError:
+                return {}

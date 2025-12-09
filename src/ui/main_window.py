@@ -389,7 +389,10 @@ class MainWindow(QMainWindow):
             # Sort by keys (default)
             clean_stats.sort(key=lambda x: x[1], reverse=True)
             
-        self.app_stats_widget.update_data(clean_stats)
+        # PROPOSED: Fetch Metadata
+        metadata = self.tracker.db.get_app_metadata_dict()
+        
+        self.app_stats_widget.update_data(clean_stats, metadata)
 
 
     def setup_history(self):
