@@ -74,6 +74,8 @@ class InputTracker:
         self.app_stats_buffer = {}  # {app_name: {'keys': 0, 'clicks': 0, 'scrolls': 0, 'distance': 0.0}}
         self.heatmap_buffer = {}
         self.mouse_heatmap_buffer = {}
+        self.app_heatmap_buffer = {}  # {app_name: {key_code: count}}
+        self.app_mouse_heatmap_buffer = {}  # {app_name: {(x, y): count}}
         
         self.lock = threading.Lock()
         self.last_mouse_pos = None
@@ -176,9 +178,9 @@ class InputTracker:
             buffer_scroll = self.scroll_buffer
             buffer_heatmap = dict(self.heatmap_buffer)
             
-            # Merge DB mouse heatmap with current buffer if needed
-            # For mouse heatmap visual, we likely just need the raw points or a grid
-            mouse_heatmap_data = [] # For now, just return what's in buffer for live view or similar
+            # Copy app-specific heatmap buffers
+            app_heatmap_buffer_copy = {app: dict(keys) for app, keys in self.app_heatmap_buffer.items()}
+            app_mouse_heatmap_buffer_copy = {app: dict(pos) for app, pos in self.app_mouse_heatmap_buffer.items()}
             
         return {
             'keys': keys,
@@ -192,7 +194,10 @@ class InputTracker:
             'buffer_clicks': buffer_clicks,
             'buffer_distance': buffer_distance,
             'buffer_scroll': buffer_scroll,
-            'buffer_heatmap': buffer_heatmap
+            'buffer_heatmap': buffer_heatmap,
+            # App-specific heatmap buffers
+            'app_heatmap_buffer': app_heatmap_buffer_copy,
+            'app_mouse_heatmap_buffer': app_mouse_heatmap_buffer_copy
         }
 
     def get_active_app_info(self):
@@ -368,8 +373,13 @@ class InputTracker:
                 self.app_stats_buffer[app_name] = {'keys': 0, 'clicks': 0, 'scrolls': 0, 'distance': 0.0}
             self.app_stats_buffer[app_name]['keys'] += 1
             
-            # Heatmap stats
+            # Heatmap stats (global)
             self.heatmap_buffer[scan_code] = self.heatmap_buffer.get(scan_code, 0) + 1
+            
+            # App-specific heatmap
+            if app_name not in self.app_heatmap_buffer:
+                self.app_heatmap_buffer[app_name] = {}
+            self.app_heatmap_buffer[app_name][scan_code] = self.app_heatmap_buffer[app_name].get(scan_code, 0) + 1
         
         if self.on_key_press_callback:
             try:
@@ -414,15 +424,16 @@ class InputTracker:
                 self.app_stats_buffer[app] = {'keys': 0, 'clicks': 0, 'scrolls': 0, 'distance': 0.0}
             self.app_stats_buffer[app]['clicks'] += 1
             
-            # Track mouse heatmap (x, y)
-            # We round to nearest 10 pixels to group nearby clicks slightly? 
-            # Or just raw? Let's do raw for now, or maybe 5px binning.
-            # Let's do exact coordinates for now, can bin in UI or DB if needed.
-            # Actually, to prevent massive DB growth, maybe binning is better.
-            # Let's bin to 5x5 pixels
+            # Track mouse heatmap (x, y) - global
+            # Bin to 5x5 pixels
             bx = (x // 5) * 5
             by = (y // 5) * 5
             self.mouse_heatmap_buffer[(bx, by)] = self.mouse_heatmap_buffer.get((bx, by), 0) + 1
+            
+            # App-specific mouse heatmap
+            if app not in self.app_mouse_heatmap_buffer:
+                self.app_mouse_heatmap_buffer[app] = {}
+            self.app_mouse_heatmap_buffer[app][(bx, by)] = self.app_mouse_heatmap_buffer[app].get((bx, by), 0) + 1
 
     def on_scroll(self, delta):
         with self.lock:
@@ -477,6 +488,15 @@ class InputTracker:
             for (x, y), count in self.mouse_heatmap_buffer.items():
                 self.db.update_mouse_heatmap(today, x, y, count)
             
+            # Flush app-specific heatmap data
+            for app_name, key_counts in self.app_heatmap_buffer.items():
+                for key_code, count in key_counts.items():
+                    self.db.update_app_heatmap(today, app_name, key_code, count)
+            
+            for app_name, pos_counts in self.app_mouse_heatmap_buffer.items():
+                for (x, y), count in pos_counts.items():
+                    self.db.update_app_mouse_heatmap(today, app_name, x, y, count)
+            
             # Reset buffers
             self.key_buffer = 0
             self.click_buffer = 0
@@ -489,3 +509,5 @@ class InputTracker:
             # The UI should read DB + buffer.
             self.heatmap_buffer.clear()
             self.mouse_heatmap_buffer.clear()
+            self.app_heatmap_buffer.clear()
+            self.app_mouse_heatmap_buffer.clear()

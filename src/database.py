@@ -55,6 +55,29 @@ class Database:
                     PRIMARY KEY (date, x, y)
                 )
             ''')
+            
+            # App-specific keyboard heatmap data table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS app_heatmap_data (
+                    date DATE,
+                    app_name TEXT,
+                    key_code INTEGER,
+                    count INTEGER DEFAULT 0,
+                    PRIMARY KEY (date, app_name, key_code)
+                )
+            ''')
+            
+            # App-specific mouse heatmap data table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS app_mouse_heatmap_data (
+                    date DATE,
+                    app_name TEXT,
+                    x INTEGER,
+                    y INTEGER,
+                    count INTEGER DEFAULT 0,
+                    PRIMARY KEY (date, app_name, x, y)
+                )
+            ''')
             conn.commit()
             
             # Migration for new columns in app_stats
@@ -163,6 +186,30 @@ class Database:
             ''', (date, x, y, count))
             conn.commit()
 
+    def update_app_heatmap(self, date, app_name, key_code, count):
+        """Update app-specific keyboard heatmap data."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO app_heatmap_data (date, app_name, key_code, count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(date, app_name, key_code) DO UPDATE SET
+                    count = count + excluded.count
+            ''', (date, app_name, key_code, count))
+            conn.commit()
+
+    def update_app_mouse_heatmap(self, date, app_name, x, y, count):
+        """Update app-specific mouse heatmap data."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO app_mouse_heatmap_data (date, app_name, x, y, count)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(date, app_name, x, y) DO UPDATE SET
+                    count = count + excluded.count
+            ''', (date, app_name, x, y, count))
+            conn.commit()
+
     def get_today_stats(self):
         today = datetime.date.today()
         with self.get_connection() as conn:
@@ -187,16 +234,24 @@ class Database:
             rows = cursor.fetchall()
             return {row[0]: row[1] for row in rows}
 
-    def get_heatmap_range(self, start_date, end_date):
-        """Get aggregated heatmap data for a date range."""
+    def get_heatmap_range(self, start_date, end_date, app_filter=None):
+        """Get aggregated heatmap data for a date range, optionally filtered by app."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT key_code, SUM(count) as total_count 
-                FROM heatmap_data 
-                WHERE date BETWEEN ? AND ? 
-                GROUP BY key_code
-            ''', (start_date, end_date))
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT key_code, SUM(count) as total_count 
+                    FROM app_heatmap_data 
+                    WHERE date BETWEEN ? AND ? AND app_name = ?
+                    GROUP BY key_code
+                ''', (start_date, end_date, app_filter))
+            else:
+                cursor.execute('''
+                    SELECT key_code, SUM(count) as total_count 
+                    FROM heatmap_data 
+                    WHERE date BETWEEN ? AND ? 
+                    GROUP BY key_code
+                ''', (start_date, end_date))
             rows = cursor.fetchall()
             return {row[0]: row[1] for row in rows}
 
@@ -208,16 +263,24 @@ class Database:
             cursor.execute('SELECT x, y, count FROM mouse_heatmap_data WHERE date = ?', (today,))
             return cursor.fetchall()
 
-    def get_mouse_heatmap_range(self, start_date, end_date):
-        """Get aggregated mouse heatmap data for a date range."""
+    def get_mouse_heatmap_range(self, start_date, end_date, app_filter=None):
+        """Get aggregated mouse heatmap data for a date range, optionally filtered by app."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT x, y, SUM(count) as total_count 
-                FROM mouse_heatmap_data 
-                WHERE date BETWEEN ? AND ? 
-                GROUP BY x, y
-            ''', (start_date, end_date))
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT x, y, SUM(count) as total_count 
+                    FROM app_mouse_heatmap_data 
+                    WHERE date BETWEEN ? AND ? AND app_name = ?
+                    GROUP BY x, y
+                ''', (start_date, end_date, app_filter))
+            else:
+                cursor.execute('''
+                    SELECT x, y, SUM(count) as total_count 
+                    FROM mouse_heatmap_data 
+                    WHERE date BETWEEN ? AND ? 
+                    GROUP BY x, y
+                ''', (start_date, end_date))
             return cursor.fetchall()
 
     def get_stats_range(self, start_date, end_date):

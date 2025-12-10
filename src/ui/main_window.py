@@ -221,17 +221,10 @@ class MainWindow(QMainWindow):
         layout.setSpacing(20)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        # Header with Title and Time Range Selector
+        # Header with controls (no title to save horizontal space)
         header = QHBoxLayout()
         
-        self.heatmap_title = QLabel("Heatmap")
-        self.heatmap_title.setFont(QFont("Arial", 28, QFont.Bold))
-        self.heatmap_title.setStyleSheet("color: white;")
-        header.addWidget(self.heatmap_title)
-        
-        header.addStretch()
-        
-        # View Switcher (Keyboard / Mouse)
+        # View Switcher (Keyboard / Mouse) - placed at left
         self.view_switcher_layout = QHBoxLayout()
         self.view_switcher_layout.setSpacing(0)
         
@@ -253,6 +246,9 @@ class MainWindow(QMainWindow):
         
         self.view_switcher_layout.addWidget(self.btn_keyboard)
         self.view_switcher_layout.addWidget(self.btn_mouse)
+        
+        header.addLayout(self.view_switcher_layout)
+        header.addStretch()
         
         # Style for the toggle buttons
         switcher_style = """
@@ -287,10 +283,45 @@ class MainWindow(QMainWindow):
         self.btn_keyboard.setStyleSheet(switcher_style)
         self.btn_mouse.setStyleSheet(switcher_style)
         
-        header.addLayout(self.view_switcher_layout)
+        # App Filter Dropdown
+        self.heatmap_app_filter = QComboBox()
+        self.heatmap_app_filter.setMinimumWidth(180)
+        self.heatmap_app_filter.setStyleSheet("""
+            QComboBox {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #3d3d3d;
+                border-radius: 5px;
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            QComboBox:hover {
+                background-color: #3d3d3d;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #aaaaaa;
+                margin-right: 8px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                selection-background-color: #00e676;
+                selection-color: #1e1e1e;
+                border: 1px solid #3d3d3d;
+            }
+        """)
+        self.heatmap_app_filter.addItem("All Applications")
+        self.heatmap_app_filter.currentTextChanged.connect(self.on_heatmap_app_changed)
+        header.addWidget(self.heatmap_app_filter)
         
-        # Spacer
-        header.addSpacing(20)
+        header.addSpacing(10)
         
         self.heatmap_time_selector = TimeRangeSelector()
         self.heatmap_time_selector.range_changed.connect(self.on_heatmap_range_changed)
@@ -308,11 +339,13 @@ class MainWindow(QMainWindow):
         self.heatmap_stack.addWidget(self.mouse_heatmap)
         
         layout.addWidget(self.heatmap_stack)
+        
+        # Refresh app list
+        self.refresh_heatmap_app_list()
         layout.addStretch()
 
     def on_heatmap_type_changed(self, index):
         self.heatmap_stack.setCurrentIndex(index)
-        self.heatmap_title.setText("Keyboard Heatmap" if index == 0 else "Mouse Heatmap")
         self.update_heatmap()
 
     def setup_apps(self):
@@ -418,6 +451,45 @@ class MainWindow(QMainWindow):
         """Handle time range selection change in heatmap."""
         self.update_heatmap()
 
+    def on_heatmap_app_changed(self, app_name):
+        """Handle app filter selection change in heatmap."""
+        self.update_heatmap()
+
+    def refresh_heatmap_app_list(self):
+        """Refresh the app list in heatmap filter dropdown."""
+        current_text = self.heatmap_app_filter.currentText()
+        self.heatmap_app_filter.blockSignals(True)
+        self.heatmap_app_filter.clear()
+        self.heatmap_app_filter.addItem("All Applications")
+        
+        # Get all apps from database
+        apps = self.tracker.db.get_all_apps()
+        metadata = self.tracker.db.get_app_metadata_dict()
+        
+        for app in apps:
+            # Use friendly name if available, otherwise strip .exe
+            if app in metadata and metadata[app].get('friendly_name'):
+                display_name = metadata[app]['friendly_name']
+            else:
+                # Strip .exe suffix for cleaner display
+                display_name = app[:-4] if app.lower().endswith('.exe') else app
+            self.heatmap_app_filter.addItem(display_name, app)  # userData is the raw app_name
+        
+        # Restore previous selection if still exists
+        idx = self.heatmap_app_filter.findText(current_text)
+        if idx >= 0:
+            self.heatmap_app_filter.setCurrentIndex(idx)
+        
+        self.heatmap_app_filter.blockSignals(False)
+
+    def get_selected_heatmap_app(self):
+        """Get the raw app_name from the heatmap filter dropdown."""
+        idx = self.heatmap_app_filter.currentIndex()
+        if idx == 0:
+            return None  # "All Applications"
+        # Get userData (raw app_name)
+        return self.heatmap_app_filter.itemData(idx)
+
     def update_stats(self):
         # Get date range from selector
         start_date, end_date = self.time_selector.get_date_range()
@@ -450,7 +522,14 @@ class MainWindow(QMainWindow):
         self.card_distance.update_value(f"{distance:.2f}")
         self.card_scroll.update_value(f"{scroll:.0f}")
         
-        # Update Heatmap (only if on today or using heatmap tab)
+        # Refresh app list periodically (every 10 updates = 10 seconds)
+        if not hasattr(self, '_app_list_refresh_counter'):
+            self._app_list_refresh_counter = 0
+        self._app_list_refresh_counter += 1
+        if self._app_list_refresh_counter >= 10:
+            self._app_list_refresh_counter = 0
+            self.refresh_heatmap_app_list()
+        
         # Update Heatmap (only if on today or using heatmap tab)
         self.update_heatmap()
         
@@ -459,24 +538,34 @@ class MainWindow(QMainWindow):
             self.update_apps()
 
     def update_heatmap(self):
-        """Update keyboard heatmap based on heatmap tab's time selector."""
+        """Update keyboard heatmap based on heatmap tab's time selector and app filter."""
         start_date, end_date = self.heatmap_time_selector.get_date_range()
+        app_filter = self.get_selected_heatmap_app()
         
         if self.view_group.checkedId() == 0:
             # Keyboard Heatmap
             if start_date is None:  # All time
                 heatmap_data = self.tracker.db.get_heatmap_range(
                     datetime.date(2000, 1, 1),
-                    datetime.date.today()
+                    datetime.date.today(),
+                    app_filter=app_filter
                 )
             else:
-                heatmap_data = self.tracker.db.get_heatmap_range(start_date, end_date)
+                heatmap_data = self.tracker.db.get_heatmap_range(start_date, end_date, app_filter=app_filter)
             
             # Add current buffer if viewing today
             if self.heatmap_time_selector.current_range == 'today':
-                buffer = self.tracker.get_stats_snapshot().get('heatmap', {})
-                for key, count in buffer.items():
-                    heatmap_data[key] = heatmap_data.get(key, 0) + count
+                snapshot = self.tracker.get_stats_snapshot()
+                if app_filter:
+                    # Get app-specific buffer
+                    app_buffer = snapshot.get('app_heatmap_buffer', {}).get(app_filter, {})
+                    for key, count in app_buffer.items():
+                        heatmap_data[key] = heatmap_data.get(key, 0) + count
+                else:
+                    # Get global buffer
+                    buffer = snapshot.get('heatmap', {})
+                    for key, count in buffer.items():
+                        heatmap_data[key] = heatmap_data.get(key, 0) + count
             
             self.keyboard_heatmap.update_data(heatmap_data)
             
@@ -485,10 +574,11 @@ class MainWindow(QMainWindow):
             if start_date is None:
                 raw_data = self.tracker.db.get_mouse_heatmap_range(
                     datetime.date(2000, 1, 1),
-                    datetime.date.today()
+                    datetime.date.today(),
+                    app_filter=app_filter
                 )
             else:
-                raw_data = self.tracker.db.get_mouse_heatmap_range(start_date, end_date)
+                raw_data = self.tracker.db.get_mouse_heatmap_range(start_date, end_date, app_filter=app_filter)
                 
             # raw_data is list of (x, y, count) tuples
             # Convert to dict for widget
@@ -496,9 +586,17 @@ class MainWindow(QMainWindow):
             
             # Add buffer if today
             if self.heatmap_time_selector.current_range == 'today':
-                buffer = self.tracker.get_stats_snapshot().get('mouse_heatmap', {})
-                for (x, y), count in buffer.items():
-                    mouse_data[(x, y)] = mouse_data.get((x, y), 0) + count
+                snapshot = self.tracker.get_stats_snapshot()
+                if app_filter:
+                    # Get app-specific buffer
+                    app_buffer = snapshot.get('app_mouse_heatmap_buffer', {}).get(app_filter, {})
+                    for (x, y), count in app_buffer.items():
+                        mouse_data[(x, y)] = mouse_data.get((x, y), 0) + count
+                else:
+                    # Get global buffer
+                    buffer = snapshot.get('mouse_heatmap', {})
+                    for (x, y), count in buffer.items():
+                        mouse_data[(x, y)] = mouse_data.get((x, y), 0) + count
             
             self.mouse_heatmap.update_data(mouse_data)
 
