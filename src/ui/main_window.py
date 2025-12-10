@@ -9,6 +9,7 @@ from .history_chart import HistoryChartWidget
 from .app_stats_widget import AppStatsWidget
 from .pie_chart import AppPieChartWidget
 from .settings import SettingsWidget
+from .screen_time_widget import ScreenTimeWidget
 from ..config import Config
 import datetime
 
@@ -175,6 +176,10 @@ class MainWindow(QMainWindow):
         self.setup_history()
         self.tabs.addTab(self.history_tab, "History")
         
+        # Screen Time Tab
+        self.screen_time_tab = ScreenTimeWidget(self.tracker, self.tracker.db)
+        self.tabs.addTab(self.screen_time_tab, "Screen Time")
+        
         # Settings Tab
         self.settings_tab = SettingsWidget(self.config, self.tracker.db)
         self.settings_tab.theme_changed.connect(self.on_theme_changed)
@@ -203,6 +208,14 @@ class MainWindow(QMainWindow):
                 self.update_apps()
             except Exception as e:
                 print(f"[ERROR] update_apps on tab change failed: {e}")
+                import traceback
+                traceback.print_exc()
+        # Refresh screen time tab when selected
+        elif self.tabs.widget(index) == self.screen_time_tab:
+            try:
+                self.screen_time_tab.refresh_data()
+            except Exception as e:
+                print(f"[ERROR] screen_time refresh on tab change failed: {e}")
                 import traceback
                 traceback.print_exc()
 
@@ -688,6 +701,10 @@ class MainWindow(QMainWindow):
         # Update Apps (only if visible or on today)
         if self.tabs.currentWidget() == self.apps_tab:
             self.update_apps()
+        
+        # Update Screen Time (only if visible)
+        if self.tabs.currentWidget() == self.screen_time_tab:
+            self.screen_time_tab.refresh_data()
 
     def update_heatmap(self):
         """Update keyboard heatmap based on heatmap tab's time selector and app filter."""

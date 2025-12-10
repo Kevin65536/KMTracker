@@ -100,6 +100,17 @@ class Database:
             # Ensure app_metadata table exists
             self._migrate_app_metadata_schema()
             
+            # App foreground time table for screen time tracking
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS app_foreground_time (
+                    date DATE,
+                    hour INTEGER,
+                    app_name TEXT,
+                    duration_seconds INTEGER DEFAULT 0,
+                    PRIMARY KEY (date, hour, app_name)
+                )
+            ''')
+            
             conn.commit()
 
     def _migrate_app_stats_schema(self):
@@ -564,3 +575,93 @@ class Database:
                 return {row[0]: {'friendly_name': row[1], 'exe_path': row[2]} for row in rows}
             except sqlite3.OperationalError:
                 return {}
+
+    # ==================== Screen Time / Foreground Time Methods ====================
+    
+    def update_foreground_time(self, date, hour, app_name, duration_seconds):
+        """Update app foreground time for a specific date and hour."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO app_foreground_time (date, hour, app_name, duration_seconds)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(date, hour, app_name) DO UPDATE SET
+                    duration_seconds = duration_seconds + excluded.duration_seconds
+            ''', (date, hour, app_name, duration_seconds))
+            conn.commit()
+
+    def get_foreground_time_by_app(self, start_date, end_date):
+        """Get total foreground time per app within date range. Returns list of (app_name, total_seconds)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT app_name, SUM(duration_seconds) as total_seconds
+                FROM app_foreground_time
+                WHERE date BETWEEN ? AND ?
+                GROUP BY app_name
+                ORDER BY total_seconds DESC
+            ''', (start_date, end_date))
+            return cursor.fetchall()
+
+    def get_foreground_time_hourly(self, date, app_filter=None):
+        """Get hourly foreground time for a specific date. Returns list of (hour, total_seconds)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT hour, SUM(duration_seconds) as total_seconds
+                    FROM app_foreground_time
+                    WHERE date = ? AND app_name = ?
+                    GROUP BY hour
+                    ORDER BY hour ASC
+                ''', (date, app_filter))
+            else:
+                cursor.execute('''
+                    SELECT hour, SUM(duration_seconds) as total_seconds
+                    FROM app_foreground_time
+                    WHERE date = ?
+                    GROUP BY hour
+                    ORDER BY hour ASC
+                ''', (date,))
+            return cursor.fetchall()
+
+    def get_foreground_time_daily(self, start_date, end_date, app_filter=None):
+        """Get daily foreground time for date range. Returns list of (date, total_seconds)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT date, SUM(duration_seconds) as total_seconds
+                    FROM app_foreground_time
+                    WHERE date BETWEEN ? AND ? AND app_name = ?
+                    GROUP BY date
+                    ORDER BY date ASC
+                ''', (start_date, end_date, app_filter))
+            else:
+                cursor.execute('''
+                    SELECT date, SUM(duration_seconds) as total_seconds
+                    FROM app_foreground_time
+                    WHERE date BETWEEN ? AND ?
+                    GROUP BY date
+                    ORDER BY date ASC
+                ''', (start_date, end_date))
+            return cursor.fetchall()
+
+    def get_total_foreground_time(self, start_date, end_date, app_filter=None):
+        """Get total foreground time for date range in seconds."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if app_filter and app_filter != "All Applications":
+                cursor.execute('''
+                    SELECT SUM(duration_seconds)
+                    FROM app_foreground_time
+                    WHERE date BETWEEN ? AND ? AND app_name = ?
+                ''', (start_date, end_date, app_filter))
+            else:
+                cursor.execute('''
+                    SELECT SUM(duration_seconds)
+                    FROM app_foreground_time
+                    WHERE date BETWEEN ? AND ?
+                ''', (start_date, end_date))
+            result = cursor.fetchone()
+            return result[0] or 0

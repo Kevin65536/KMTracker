@@ -76,6 +76,11 @@ class InputTracker:
         self.app_heatmap_buffer = {}  # {app_name: {key_code: count}}
         self.app_mouse_heatmap_buffer = {}  # {app_name: {(x, y): count}}
         
+        # Screen time tracking
+        self.foreground_time_buffer = {}  # {app_name: seconds}
+        self.current_foreground_app = None
+        self.foreground_app_start_time = None
+        
         self.lock = threading.Lock()
         self.last_mouse_pos = None
         self.cached_app_name = "Unknown"
@@ -138,12 +143,73 @@ class InputTracker:
         # Start flush timer
         self.flush_thread = threading.Thread(target=self.flush_loop, daemon=True)
         self.flush_thread.start()
+        
+        # Start foreground window tracker
+        self.foreground_thread = threading.Thread(target=self.foreground_track_loop, daemon=True)
+        self.foreground_thread.start()
 
     def stop(self):
         self.running = False
         if self.hook_thread_id:
             user32.PostThreadMessageW(self.hook_thread_id, 0x0012, 0, 0)  # WM_QUIT
+        # Flush remaining foreground time
+        self._record_foreground_time()
         self.flush_stats()
+
+    def foreground_track_loop(self):
+        """Track foreground window changes every second."""
+        while self.running:
+            try:
+                self._check_foreground_window()
+            except Exception as e:
+                pass  # Silently ignore errors
+            time.sleep(1)
+
+    def _check_foreground_window(self):
+        """Check if foreground window has changed and record time."""
+        current_app = self.get_active_app_name()
+        current_time = time.time()
+        
+        with self.lock:
+            if self.current_foreground_app is None:
+                # First time initialization
+                self.current_foreground_app = current_app
+                self.foreground_app_start_time = current_time
+            elif current_app != self.current_foreground_app:
+                # Window changed, record time for previous app
+                if self.foreground_app_start_time:
+                    elapsed = current_time - self.foreground_app_start_time
+                    if elapsed > 0 and self.current_foreground_app != "Unknown":
+                        app = self.current_foreground_app
+                        self.foreground_time_buffer[app] = self.foreground_time_buffer.get(app, 0) + elapsed
+                
+                # Start tracking new app
+                self.current_foreground_app = current_app
+                self.foreground_app_start_time = current_time
+
+    def _record_foreground_time(self):
+        """Record current foreground app's accumulated time before flush."""
+        current_time = time.time()
+        with self.lock:
+            if self.current_foreground_app and self.foreground_app_start_time:
+                elapsed = current_time - self.foreground_app_start_time
+                if elapsed > 0 and self.current_foreground_app != "Unknown":
+                    app = self.current_foreground_app
+                    self.foreground_time_buffer[app] = self.foreground_time_buffer.get(app, 0) + elapsed
+                # Reset start time but keep current app
+                self.foreground_app_start_time = current_time
+
+    def get_foreground_time_snapshot(self):
+        """Get a thread-safe snapshot of current foreground time buffer."""
+        with self.lock:
+            # Include any accumulated time for current foreground app
+            buffer_copy = dict(self.foreground_time_buffer)
+            if self.current_foreground_app and self.foreground_app_start_time:
+                elapsed = time.time() - self.foreground_app_start_time
+                if elapsed > 0 and self.current_foreground_app != "Unknown":
+                    app = self.current_foreground_app
+                    buffer_copy[app] = buffer_copy.get(app, 0) + elapsed
+            return buffer_copy
 
     def get_stats_snapshot(self):
         """Get a thread-safe snapshot of current buffers + DB stats."""
@@ -441,6 +507,7 @@ class InputTracker:
     def flush_loop(self):
         while self.running:
             time.sleep(5)
+            self._record_foreground_time()  # Record current foreground time before flush
             self.flush_stats()
 
     def flush_stats(self):
@@ -490,12 +557,19 @@ class InputTracker:
                 for (x, y), count in pos_counts.items():
                     self.db.update_app_mouse_heatmap(today, app_name, x, y, count)
             
+            # Flush foreground time buffer
+            current_hour = datetime.datetime.now().hour
+            for app_name, seconds in self.foreground_time_buffer.items():
+                if seconds > 0:
+                    self.db.update_foreground_time(today, current_hour, app_name, int(seconds))
+            
             # Reset buffers
             self.key_buffer = 0
             self.click_buffer = 0
             self.distance_buffer = 0.0
             self.scroll_buffer = 0.0
             self.app_stats_buffer.clear()
+            self.foreground_time_buffer.clear()
             # Note: We do NOT clear heatmap_buffer here because we want to accumulate it for the session 
             # OR we should clear it but ensure UI reads from DB + buffer.
             # Actually, for heatmap, it's better to just write increments to DB and clear buffer.
