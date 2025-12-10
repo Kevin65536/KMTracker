@@ -60,10 +60,9 @@ user32.CallNextHookEx.argtypes = [wintypes.HHOOK, ctypes.c_int, wintypes.WPARAM,
 user32.CallNextHookEx.restype = LRESULT
 
 class InputTracker:
-    def __init__(self, db_path="tracker.db", on_key_press_callback=None):
+    def __init__(self, db_path="tracker.db"):
         self.db = Database(db_path)
         self.running = False
-        self.on_key_press_callback = on_key_press_callback
         
         # Buffers - use thread-safe access
         self.key_buffer = 0
@@ -380,12 +379,6 @@ class InputTracker:
             if app_name not in self.app_heatmap_buffer:
                 self.app_heatmap_buffer[app_name] = {}
             self.app_heatmap_buffer[app_name][scan_code] = self.app_heatmap_buffer[app_name].get(scan_code, 0) + 1
-        
-        if self.on_key_press_callback:
-            try:
-                self.on_key_press_callback()
-            except Exception:
-                pass
 
     def on_move(self, x, y):
         if self.last_mouse_pos:
