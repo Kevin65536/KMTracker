@@ -12,11 +12,18 @@ from src.config import Config
 
 def main():
     # Crash/exception diagnostics: dump tracebacks on fatal errors and uncaught exceptions
-    faulthandler.enable(all_threads=True)
+    # Note: faulthandler requires sys.stderr, which is None when console=False in PyInstaller
+    if sys.stderr is not None:
+        try:
+            faulthandler.enable(all_threads=True)
+        except Exception:
+            pass  # Silently ignore if faulthandler fails
 
     def log_exception(exc_type, exc_value, exc_tb):
-        print("[FATAL] Unhandled exception:", exc_type.__name__, exc_value)
-        traceback.print_exception(exc_type, exc_value, exc_tb)
+        # When packaged without console, stderr might be None
+        if sys.stderr is not None:
+            print("[FATAL] Unhandled exception:", exc_type.__name__, exc_value, file=sys.stderr)
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     sys.excepthook = log_exception
 

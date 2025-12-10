@@ -1,3 +1,5 @@
+import os
+import sys
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 from PySide6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor, QBrush
 from PySide6.QtCore import Signal, Qt
@@ -9,8 +11,8 @@ class TrayIcon(QSystemTrayIcon):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        # Create a simple icon programmatically (green circle with K letter)
-        self.setIcon(self._create_default_icon())
+        # Load icon from file, fallback to programmatic icon
+        self.setIcon(self._load_icon())
         self.setVisible(True)
         self.setToolTip("InputTracker")
         
@@ -30,6 +32,31 @@ class TrayIcon(QSystemTrayIcon):
         self.setContextMenu(self.menu)
         
         self.activated.connect(self.on_activated)
+    
+    def _load_icon(self):
+        """Load icon from file, fallback to default icon if not found."""
+        # Try multiple paths for icon file
+        icon_paths = []
+        
+        # For PyInstaller bundled app
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle - icon is in _internal/resources/
+            base_path = sys._MEIPASS
+            icon_paths.append(os.path.join(base_path, 'resources', 'icon.ico'))
+        else:
+            # Development mode - try relative paths
+            icon_paths.append('resources/icon.ico')
+            icon_paths.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources', 'icon.ico'))
+        
+        # Try to load from each path
+        for icon_path in icon_paths:
+            if os.path.exists(icon_path):
+                icon = QIcon(icon_path)
+                if not icon.isNull():
+                    return icon
+        
+        # Fallback to programmatic icon
+        return self._create_default_icon()
     
     def _create_default_icon(self):
         """Create a simple icon programmatically."""
