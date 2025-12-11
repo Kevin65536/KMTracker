@@ -7,9 +7,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib import font_manager
 import matplotlib.pyplot as plt
 import datetime
-from ..i18n import tr, tr_list
+from ..i18n import tr, tr_list, get_language
 
 # Common Styles
 BTN_STYLE_BAR = """
@@ -74,6 +75,17 @@ COMBO_STYLE = """
     }
 """
 
+_CJK_FONT_CANDIDATES = [
+    "Microsoft YaHei",
+    "SimHei",
+    "Noto Sans CJK SC",
+    "PingFang SC",
+    "WenQuanYi Micro Hei"
+]
+
+_FONT_INITIALIZED = False
+
+
 class BaseChartWidget(QWidget):
     """Base widget for shared chart functionality."""
     def __init__(self, parent=None):
@@ -88,6 +100,7 @@ class BaseChartWidget(QWidget):
         
         # Chart
         plt.style.use('dark_background')
+        self._ensure_font_support()
         # Taller figure since we only have one chart now
         self.figure = Figure(figsize=(10, 6), facecolor='#1e1e1e')
         self.canvas = FigureCanvas(self.figure)
@@ -122,6 +135,24 @@ class BaseChartWidget(QWidget):
         ax.tick_params(colors='#aaaaaa')
         ax.grid(True, alpha=0.1)
         ax.set_ylim(bottom=0) # Non-negative axis
+
+    def _ensure_font_support(self):
+        """Configure matplotlib fonts so Chinese labels render correctly."""
+        global _FONT_INITIALIZED
+        if _FONT_INITIALIZED:
+            return
+        _FONT_INITIALIZED = True
+
+        if get_language() != 'zh':
+            return
+
+        installed = {f.name for f in font_manager.fontManager.ttflist}
+        for font_name in _CJK_FONT_CANDIDATES:
+            if font_name in installed:
+                plt.rcParams['font.family'] = font_name
+                plt.rcParams['font.sans-serif'] = [font_name, 'DejaVu Sans']
+                plt.rcParams['axes.unicode_minus'] = False
+                break
 
 class TimelineWidget(BaseChartWidget):
     """Displays user activity over time (Today/Week/History)."""
