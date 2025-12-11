@@ -1,11 +1,24 @@
 import sqlite3
 import datetime
 import os
+import sys
 
 class Database:
     def __init__(self, db_path="tracker.db"):
-        self.db_path = db_path
+        self.db_path = self._resolve_db_path(db_path)
         self.init_db()
+
+    def _resolve_db_path(self, db_path):
+        """Ensure DB path is anchored to the install directory."""
+        if os.path.isabs(db_path):
+            return db_path
+
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        return os.path.join(base_dir, db_path)
 
     def get_connection(self):
         return sqlite3.connect(self.db_path)
