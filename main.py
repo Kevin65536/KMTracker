@@ -3,12 +3,34 @@ import signal
 import os
 import faulthandler
 import traceback
+import ctypes
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 from PySide6.QtCore import QTimer
 from src.tracker import InputTracker
 from src.ui.main_window import MainWindow
 from src.ui.tray_icon import TrayIcon
 from src.config import Config
+
+
+def _load_app_icon():
+    """Load the application icon for windows and taskbar."""
+    icon_paths = []
+
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        icon_paths.append(os.path.join(sys._MEIPASS, "resources", "icon.ico"))
+    else:
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        icon_paths.append(os.path.join(base_dir, "resources", "icon.ico"))
+        icon_paths.append(os.path.join(os.path.dirname(base_dir), "resources", "icon.ico"))
+
+    for path in icon_paths:
+        if os.path.exists(path):
+            icon = QIcon(path)
+            if not icon.isNull():
+                return icon
+
+    return QIcon()
 
 def main():
     # Crash/exception diagnostics: dump tracebacks on fatal errors and uncaught exceptions
@@ -29,9 +51,19 @@ def main():
 
     # Handle Ctrl+C
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    # Set Windows AppUserModelID so the taskbar uses our icon instead of the default python icon
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("InputTracker")
+    except Exception:
+        pass
     
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    app_icon = _load_app_icon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
     
     skip_tracker = os.environ.get("SKIP_TRACKER", "0") == "1"
     if skip_tracker:
@@ -46,6 +78,8 @@ def main():
     
     # Initialize UI
     window = MainWindow(tracker, config)
+    if not app_icon.isNull():
+        window.setWindowIcon(app_icon)
     tray = TrayIcon()
     
     # Connect signals
