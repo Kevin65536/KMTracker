@@ -16,8 +16,8 @@ import datetime
 
 
 class TimeRangeSelector(QWidget):
-    """Button bar for selecting time range: Today, Week, Month, Year, All"""
-    range_changed = Signal(str)  # Emits: 'today', 'week', 'month', 'year', 'all'
+    """Button bar for selecting time range: Today, Yesterday, Week, Month, Year/All"""
+    range_changed = Signal(str)  # Emits: 'today', 'yesterday', 'week', 'month', 'year', 'all'
     
     def __init__(self):
         super().__init__()
@@ -28,9 +28,13 @@ class TimeRangeSelector(QWidget):
         layout.setSpacing(5)
         
         self.buttons = {}
-        self.range_keys = ['today', 'week', 'month', 'year', 'all']
+        # Regular button keys (Yesterday added, Year/All moved to dropdown)
+        self.button_keys = ['today', 'yesterday', 'week', 'month']
+        # Dropdown keys for less common options
+        self.dropdown_keys = ['year', 'all']
         
-        for key in self.range_keys:
+        # Create regular buttons
+        for key in self.button_keys:
             btn = QPushButton(tr(f'time.{key}'))
             btn.setCheckable(True)
             btn.setMinimumWidth(80)
@@ -38,12 +42,24 @@ class TimeRangeSelector(QWidget):
             self.buttons[key] = btn
             layout.addWidget(btn)
         
+        # Create dropdown for Year/All Time
+        self.extended_combo = QComboBox()
+        self.extended_combo.setMinimumWidth(100)
+        for key in self.dropdown_keys:
+            self.extended_combo.addItem(tr(f'time.{key}'), key)
+        self.extended_combo.currentIndexChanged.connect(self.on_combo_selected)
+        layout.addWidget(self.extended_combo)
+        
+        # Style the combo to look like other buttons when not active
+        self._combo_active = False
+        self._update_combo_style()
+        
         # Select 'today' by default
         self.buttons['today'].setChecked(True)
         
         layout.addStretch()
         
-        # Apply styling
+        # Apply button styling
         self.setStyleSheet("""
             QPushButton {
                 background-color: #3d3d3d;
@@ -63,22 +79,113 @@ class TimeRangeSelector(QWidget):
             }
         """)
     
+    def _update_combo_style(self):
+        """Update combo box style based on whether it's the active selection."""
+        if self._combo_active:
+            self.extended_combo.setStyleSheet("""
+                QComboBox {
+                    background-color: #00e676;
+                    color: #1e1e1e;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    width: 20px;
+                }
+                QComboBox::down-arrow {
+                    image: none;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-top: 6px solid #1e1e1e;
+                    margin-right: 8px;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                    selection-background-color: #00e676;
+                    selection-color: #1e1e1e;
+                    border: 1px solid #3d3d3d;
+                }
+            """)
+        else:
+            self.extended_combo.setStyleSheet("""
+                QComboBox {
+                    background-color: #3d3d3d;
+                    color: #aaaaaa;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                }
+                QComboBox:hover {
+                    background-color: #4a4a4a;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    width: 20px;
+                }
+                QComboBox::down-arrow {
+                    image: none;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-top: 6px solid #aaaaaa;
+                    margin-right: 8px;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                    selection-background-color: #00e676;
+                    selection-color: #1e1e1e;
+                    border: 1px solid #3d3d3d;
+                }
+            """)
+    
     def retranslate_ui(self):
-        """Update button text for current language."""
-        for key in self.range_keys:
+        """Update button/combo text for current language."""
+        for key in self.button_keys:
             self.buttons[key].setText(tr(f'time.{key}'))
+        # Update combo items
+        for i, key in enumerate(self.dropdown_keys):
+            self.extended_combo.setItemText(i, tr(f'time.{key}'))
     
     def on_range_selected(self, key):
+        """Handle button selection."""
+        # Uncheck all buttons
         for k, btn in self.buttons.items():
             btn.setChecked(k == key)
+        # Deactivate combo style
+        self._combo_active = False
+        self._update_combo_style()
+        
         self.current_range = key
         self.range_changed.emit(key)
+    
+    def on_combo_selected(self, index):
+        """Handle combo box selection."""
+        key = self.extended_combo.itemData(index)
+        if key:
+            # Uncheck all buttons
+            for btn in self.buttons.values():
+                btn.setChecked(False)
+            # Activate combo style
+            self._combo_active = True
+            self._update_combo_style()
+            
+            self.current_range = key
+            self.range_changed.emit(key)
     
     def get_date_range(self):
         """Returns (start_date, end_date) based on current selection."""
         today = datetime.date.today()
         if self.current_range == 'today':
             return today, today
+        elif self.current_range == 'yesterday':
+            yesterday = today - datetime.timedelta(days=1)
+            return yesterday, yesterday
         elif self.current_range == 'week':
             return today - datetime.timedelta(days=6), today
         elif self.current_range == 'month':
@@ -611,6 +718,7 @@ class MainWindow(QMainWindow):
         """Handle time range selection change in dashboard."""
         title_keys = {
             'today': 'dashboard.title.today',
+            'yesterday': 'dashboard.title.yesterday',
             'week': 'dashboard.title.week',
             'month': 'dashboard.title.month',
             'year': 'dashboard.title.year',

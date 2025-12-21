@@ -31,6 +31,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         
         # Time range selector
         'time.today': 'Today',
+        'time.yesterday': 'Yesterday',
         'time.week': 'Week',
         'time.month': 'Month',
         'time.year': 'Year',
@@ -38,6 +39,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         
         # Dashboard
         'dashboard.title.today': "Today's Statistics",
+        'dashboard.title.yesterday': "Yesterday's Statistics",
         'dashboard.title.week': "This Week's Statistics",
         'dashboard.title.month': "This Month's Statistics",
         'dashboard.title.year': "This Year's Statistics",
@@ -171,6 +173,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         
         # Time range selector
         'time.today': '今天',
+        'time.yesterday': '昨天',
         'time.week': '本周',
         'time.month': '本月',
         'time.year': '今年',
@@ -178,6 +181,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         
         # Dashboard
         'dashboard.title.today': "今日统计",
+        'dashboard.title.yesterday': "昨日统计",
         'dashboard.title.week': "本周统计",
         'dashboard.title.month': "本月统计",
         'dashboard.title.year': "今年统计",
