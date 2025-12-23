@@ -623,69 +623,73 @@ class ActivityTrack:
 
     def flush_stats(self):
         with self.lock:
-            if self.key_buffer == 0 and self.click_buffer == 0 and self.distance_buffer == 0 and self.scroll_buffer == 0:
+            has_input = (self.key_buffer > 0 or self.click_buffer > 0 or 
+                         self.distance_buffer > 0 or self.scroll_buffer > 0)
+            
+            # Check if foreground time buffer has any non-zero values
+            has_time = any(s > 0 for s in self.foreground_time_buffer.values())
+
+            if not has_input and not has_time:
                 return
 
             today = datetime.date.today()
-            
-            self.db.update_stats(
-                today, 
-                self.key_buffer, 
-                self.click_buffer, 
-                self.distance_buffer, 
-                self.scroll_buffer
-            )
-            
             current_hour = datetime.datetime.now().hour
-            for app, stats in self.app_stats_buffer.items():
-                self.db.update_app_stats(today, app, 
-                    key_count=stats['keys'], 
-                    click_count=stats['clicks'],
-                    scroll_count=stats['scrolls'],
-                    distance=stats['distance']
+            
+            if has_input:
+                self.db.update_stats(
+                    today, 
+                    self.key_buffer, 
+                    self.click_buffer, 
+                    self.distance_buffer, 
+                    self.scroll_buffer
                 )
                 
-                # Granular hourly stats
-                self.db.update_hourly_app_stats(today, current_hour, app,
-                    key_count=stats['keys'], 
-                    clicks=stats['clicks'],
-                    scrolls=stats['scrolls'],
-                    distance=stats['distance']
-                )
-            
-            for key_code, count in self.heatmap_buffer.items():
-                self.db.update_heatmap(today, key_code, count)
+                for app, stats in self.app_stats_buffer.items():
+                    self.db.update_app_stats(today, app, 
+                        key_count=stats['keys'], 
+                        click_count=stats['clicks'],
+                        scroll_count=stats['scrolls'],
+                        distance=stats['distance']
+                    )
+                    
+                    # Granular hourly stats
+                    self.db.update_hourly_app_stats(today, current_hour, app,
+                        key_count=stats['keys'], 
+                        clicks=stats['clicks'],
+                        scrolls=stats['scrolls'],
+                        distance=stats['distance']
+                    )
                 
-            for (x, y), count in self.mouse_heatmap_buffer.items():
-                self.db.update_mouse_heatmap(today, x, y, count)
+                for key_code, count in self.heatmap_buffer.items():
+                    self.db.update_heatmap(today, key_code, count)
+                    
+                for (x, y), count in self.mouse_heatmap_buffer.items():
+                    self.db.update_mouse_heatmap(today, x, y, count)
+                
+                # Flush app-specific heatmap data
+                for app_name, key_counts in self.app_heatmap_buffer.items():
+                    for key_code, count in key_counts.items():
+                        self.db.update_app_heatmap(today, app_name, key_code, count)
+                
+                for app_name, pos_counts in self.app_mouse_heatmap_buffer.items():
+                    for (x, y), count in pos_counts.items():
+                        self.db.update_app_mouse_heatmap(today, app_name, x, y, count)
+
+                # Reset input buffers
+                self.key_buffer = 0
+                self.click_buffer = 0
+                self.distance_buffer = 0.0
+                self.scroll_buffer = 0.0
+                self.app_stats_buffer.clear()
+                self.heatmap_buffer.clear()
+                self.mouse_heatmap_buffer.clear()
+                self.app_heatmap_buffer.clear()
+                self.app_mouse_heatmap_buffer.clear()
             
-            # Flush app-specific heatmap data
-            for app_name, key_counts in self.app_heatmap_buffer.items():
-                for key_code, count in key_counts.items():
-                    self.db.update_app_heatmap(today, app_name, key_code, count)
-            
-            for app_name, pos_counts in self.app_mouse_heatmap_buffer.items():
-                for (x, y), count in pos_counts.items():
-                    self.db.update_app_mouse_heatmap(today, app_name, x, y, count)
-            
-            # Flush foreground time buffer
-            current_hour = datetime.datetime.now().hour
-            for app_name, seconds in self.foreground_time_buffer.items():
-                if seconds > 0:
-                    self.db.update_foreground_time(today, current_hour, app_name, int(seconds))
-            
-            # Reset buffers
-            self.key_buffer = 0
-            self.click_buffer = 0
-            self.distance_buffer = 0.0
-            self.scroll_buffer = 0.0
-            self.app_stats_buffer.clear()
-            self.foreground_time_buffer.clear()
-            # Note: We do NOT clear heatmap_buffer here because we want to accumulate it for the session 
-            # OR we should clear it but ensure UI reads from DB + buffer.
-            # Actually, for heatmap, it's better to just write increments to DB and clear buffer.
-            # The UI should read DB + buffer.
-            self.heatmap_buffer.clear()
-            self.mouse_heatmap_buffer.clear()
-            self.app_heatmap_buffer.clear()
-            self.app_mouse_heatmap_buffer.clear()
+            if has_time:
+                # Flush foreground time buffer
+                for app_name, seconds in self.foreground_time_buffer.items():
+                    if seconds > 0:
+                        self.db.update_foreground_time(today, current_hour, app_name, int(seconds))
+                
+                self.foreground_time_buffer.clear()
