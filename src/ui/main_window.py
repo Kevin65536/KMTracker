@@ -293,6 +293,7 @@ class MainWindow(QMainWindow):
         # Settings Tab
         self.settings_tab = SettingsWidget(self.config, self.tracker.db)
         self.settings_tab.theme_changed.connect(self.on_theme_changed)
+        self.settings_tab.keyboard_layout_changed.connect(self.on_keyboard_layout_changed)
         self.settings_tab.language_changed.connect(self.on_language_changed)
         self.settings_tab.settings_changed.connect(self.on_settings_changed)
         self.tabs.addTab(self.settings_tab, tr('tab.settings'))
@@ -487,7 +488,10 @@ class MainWindow(QMainWindow):
         # Stacked Widget for Heatmaps
         self.heatmap_stack = QStackedWidget()
         
-        self.keyboard_heatmap = HeatmapWidget(theme=self.config.heatmap_theme)
+        self.keyboard_heatmap = HeatmapWidget(
+            theme=self.config.heatmap_theme,
+            layout_name=self.config.keyboard_layout
+        )
         self.mouse_heatmap = MouseHeatmapWidget()
         
         self.heatmap_stack.addWidget(self.keyboard_heatmap)
@@ -888,6 +892,11 @@ class MainWindow(QMainWindow):
         """Handle heatmap theme change from settings."""
         self.keyboard_heatmap.set_theme(theme_name)
         self.update_heatmap()  # Refresh to show new theme
+    
+    def on_keyboard_layout_changed(self, layout_name):
+        """Handle keyboard layout change from settings."""
+        self.keyboard_heatmap.set_layout(layout_name)
+        self.update_heatmap()  # Refresh to show new layout
 
     def on_language_changed(self, lang_code):
         """Handle language change from settings."""

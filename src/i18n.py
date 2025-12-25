@@ -137,6 +137,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'theme.viridis': 'Viridis (Purple → Blue → Green → Yellow)',
         'theme.plasma': 'Plasma (Blue → Purple → Orange → Yellow)',
         
+        # Keyboard layout names
+        'settings.keyboard_layout': 'Keyboard layout:',
+        'layout.full': 'Full-size (104 keys with Numpad)',
+        'layout.tkl': 'Tenkeyless / TKL (87 keys)',
+        'layout.75': '75% Compact',
+        'layout.60': '60% Compact',
+        
         # Dialogs
         'dialog.clear_data.title': 'Clear All Data',
         'dialog.clear_data.message': "Are you sure you want to delete all tracking data?\n\nThis action cannot be undone!",
@@ -278,6 +285,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'theme.monochrome': '单色（深灰 → 浅灰）',
         'theme.viridis': 'Viridis（紫 → 蓝 → 绿 → 黄）',
         'theme.plasma': 'Plasma（蓝 → 紫 → 橙 → 黄）',
+        
+        # Keyboard layout names
+        'settings.keyboard_layout': '键盘布局：',
+        'layout.full': '全尺寸（104键，含数字键盘）',
+        'layout.tkl': '无数字键盘 / TKL（87键）',
+        'layout.75': '75% 紧凑布局',
+        'layout.60': '60% 紧凑布局',
         
         # Dialogs
         'dialog.clear_data.title': '清除所有数据',

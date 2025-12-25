@@ -6,16 +6,21 @@ from scipy.ndimage import gaussian_filter
 import win32api
 from ..config import get_theme_color, HEATMAP_THEMES
 
-# Standard US keyboard layout with scan codes
+# =============================================================================
+# Keyboard Layout Definitions
 # Format: (scan_code, label, row, col, width)
 # Width is in key units (1 = standard key width)
-KEYBOARD_LAYOUT = [
-    # Row 0: Function keys
+# =============================================================================
+
+# Common key definitions (shared across layouts)
+_FUNCTION_ROW = [
     (0x01, "Esc", 0, 0, 1),
     (0x3B, "F1", 0, 2, 1), (0x3C, "F2", 0, 3, 1), (0x3D, "F3", 0, 4, 1), (0x3E, "F4", 0, 5, 1),
     (0x3F, "F5", 0, 6.5, 1), (0x40, "F6", 0, 7.5, 1), (0x41, "F7", 0, 8.5, 1), (0x42, "F8", 0, 9.5, 1),
     (0x43, "F9", 0, 11, 1), (0x44, "F10", 0, 12, 1), (0x57, "F11", 0, 13, 1), (0x58, "F12", 0, 14, 1),
-    
+]
+
+_MAIN_BLOCK = [
     # Row 1: Number row
     (0x29, "`", 1, 0, 1),
     (0x02, "1", 1, 1, 1), (0x03, "2", 1, 2, 1), (0x04, "3", 1, 3, 1), (0x05, "4", 1, 4, 1),
@@ -55,6 +60,130 @@ KEYBOARD_LAYOUT = [
     (0x11D, "Ctrl", 5, 13.75, 1.25),
 ]
 
+# Navigation cluster (Ins/Del/Home/End/PgUp/PgDn + Arrows) - positioned right of main block
+_NAV_CLUSTER = [
+    # Top row: Ins, Home, PgUp
+    (0x52, "Ins", 1, 15.5, 1), (0x47, "Home", 1, 16.5, 1), (0x49, "PgUp", 1, 17.5, 1),
+    # Second row: Del, End, PgDn
+    (0x53, "Del", 2, 15.5, 1), (0x4F, "End", 2, 16.5, 1), (0x51, "PgDn", 2, 17.5, 1),
+    # Arrow keys (inverted-T)
+    (0x48, "↑", 4, 16.5, 1),
+    (0x4B, "←", 5, 15.5, 1), (0x50, "↓", 5, 16.5, 1), (0x4D, "→", 5, 17.5, 1),
+]
+
+# Numpad cluster - positioned right of nav cluster
+# Format for keys that span rows: (scan_code, label, row, col, width, height)
+_NUMPAD = [
+    # Row 1
+    (0x45, "Num", 1, 19, 1, 1), (0x135, "/", 1, 20, 1, 1), (0x37, "*", 1, 21, 1, 1), (0x4A, "-", 1, 22, 1, 1),
+    # Row 2-3: 7,8,9 on row 2; 4,5,6 on row 3; + spans rows 2-3
+    (0x47, "7", 2, 19, 1, 1), (0x48, "8", 2, 20, 1, 1), (0x49, "9", 2, 21, 1, 1), (0x4E, "+", 2, 22, 1, 2),  # + spans 2 rows (height=2)
+    # Row 3
+    (0x4B, "4", 3, 19, 1, 1), (0x4C, "5", 3, 20, 1, 1), (0x4D, "6", 3, 21, 1, 1),
+    # Row 4-5: 1,2,3 on row 4; 0 on row 5; Enter spans rows 4-5
+    (0x4F, "1", 4, 19, 1, 1), (0x50, "2", 4, 20, 1, 1), (0x51, "3", 4, 21, 1, 1), (0x11C, "Ent", 4, 22, 1, 2),  # Enter spans 2 rows (height=2)
+    # Row 5
+    (0x52, "0", 5, 19, 2, 1), (0x53, ".", 5, 21, 1, 1),
+]
+
+# =============================================================================
+# Predefined Keyboard Layouts
+# =============================================================================
+
+KEYBOARD_LAYOUTS = {
+    # Full-size 104-key layout (ANSI)
+    'full': _FUNCTION_ROW + _MAIN_BLOCK + _NAV_CLUSTER + _NUMPAD,
+    
+    # Tenkeyless (TKL) - no numpad
+    'tkl': _FUNCTION_ROW + _MAIN_BLOCK + _NAV_CLUSTER,
+    
+    # 75% - compact with F-row and nav keys compressed
+    '75': [
+        # F-row (compressed)
+        (0x01, "Esc", 0, 0, 1),
+        (0x3B, "F1", 0, 1, 1), (0x3C, "F2", 0, 2, 1), (0x3D, "F3", 0, 3, 1), (0x3E, "F4", 0, 4, 1),
+        (0x3F, "F5", 0, 5, 1), (0x40, "F6", 0, 6, 1), (0x41, "F7", 0, 7, 1), (0x42, "F8", 0, 8, 1),
+        (0x43, "F9", 0, 9, 1), (0x44, "F10", 0, 10, 1), (0x57, "F11", 0, 11, 1), (0x58, "F12", 0, 12, 1),
+        (0x53, "Del", 0, 13, 1), (0x47, "Home", 0, 14, 1), (0x4F, "End", 0, 15, 1),
+        # Number row
+        (0x29, "`", 1, 0, 1),
+        (0x02, "1", 1, 1, 1), (0x03, "2", 1, 2, 1), (0x04, "3", 1, 3, 1), (0x05, "4", 1, 4, 1),
+        (0x06, "5", 1, 5, 1), (0x07, "6", 1, 6, 1), (0x08, "7", 1, 7, 1), (0x09, "8", 1, 8, 1),
+        (0x0A, "9", 1, 9, 1), (0x0B, "0", 1, 10, 1), (0x0C, "-", 1, 11, 1), (0x0D, "=", 1, 12, 1),
+        (0x0E, "Back", 1, 13, 2), (0x49, "PgUp", 1, 15, 1),
+        # QWERTY row
+        (0x0F, "Tab", 2, 0, 1.5),
+        (0x10, "Q", 2, 1.5, 1), (0x11, "W", 2, 2.5, 1), (0x12, "E", 2, 3.5, 1), (0x13, "R", 2, 4.5, 1),
+        (0x14, "T", 2, 5.5, 1), (0x15, "Y", 2, 6.5, 1), (0x16, "U", 2, 7.5, 1), (0x17, "I", 2, 8.5, 1),
+        (0x18, "O", 2, 9.5, 1), (0x19, "P", 2, 10.5, 1), (0x1A, "[", 2, 11.5, 1), (0x1B, "]", 2, 12.5, 1),
+        (0x2B, "\\", 2, 13.5, 1.5), (0x51, "PgDn", 2, 15, 1),
+        # Home row
+        (0x3A, "Caps", 3, 0, 1.75),
+        (0x1E, "A", 3, 1.75, 1), (0x1F, "S", 3, 2.75, 1), (0x20, "D", 3, 3.75, 1), (0x21, "F", 3, 4.75, 1),
+        (0x22, "G", 3, 5.75, 1), (0x23, "H", 3, 6.75, 1), (0x24, "J", 3, 7.75, 1), (0x25, "K", 3, 8.75, 1),
+        (0x26, "L", 3, 9.75, 1), (0x27, ";", 3, 10.75, 1), (0x28, "'", 3, 11.75, 1),
+        (0x1C, "Enter", 3, 12.75, 2.25),
+        # Shift row + arrow up
+        (0x2A, "Shift", 4, 0, 2.25),
+        (0x2C, "Z", 4, 2.25, 1), (0x2D, "X", 4, 3.25, 1), (0x2E, "C", 4, 4.25, 1), (0x2F, "V", 4, 5.25, 1),
+        (0x30, "B", 4, 6.25, 1), (0x31, "N", 4, 7.25, 1), (0x32, "M", 4, 8.25, 1), (0x33, ",", 4, 9.25, 1),
+        (0x34, ".", 4, 10.25, 1), (0x35, "/", 4, 11.25, 1),
+        (0x36, "Shift", 4, 12.25, 1.75), (0x48, "↑", 4, 14, 1),
+        # Bottom row + arrows
+        (0x1D, "Ctrl", 5, 0, 1.25), (0x5B, "Win", 5, 1.25, 1.25), (0x38, "Alt", 5, 2.5, 1.25),
+        (0x39, "Space", 5, 3.75, 6.25),
+        (0x138, "Alt", 5, 10, 1), (0x11D, "Ctrl", 5, 11, 1), (0x15D, "Fn", 5, 12, 1),
+        (0x4B, "←", 5, 13, 1), (0x50, "↓", 5, 14, 1), (0x4D, "→", 5, 15, 1),
+    ],
+    
+    # 60% - compact, no F-row, no nav cluster
+    '60': [
+        # Number row (no F-row)
+        (0x01, "Esc", 0, 0, 1),
+        (0x02, "1", 0, 1, 1), (0x03, "2", 0, 2, 1), (0x04, "3", 0, 3, 1), (0x05, "4", 0, 4, 1),
+        (0x06, "5", 0, 5, 1), (0x07, "6", 0, 6, 1), (0x08, "7", 0, 7, 1), (0x09, "8", 0, 8, 1),
+        (0x0A, "9", 0, 9, 1), (0x0B, "0", 0, 10, 1), (0x0C, "-", 0, 11, 1), (0x0D, "=", 0, 12, 1),
+        (0x0E, "Back", 0, 13, 2),
+        # QWERTY row
+        (0x0F, "Tab", 1, 0, 1.5),
+        (0x10, "Q", 1, 1.5, 1), (0x11, "W", 1, 2.5, 1), (0x12, "E", 1, 3.5, 1), (0x13, "R", 1, 4.5, 1),
+        (0x14, "T", 1, 5.5, 1), (0x15, "Y", 1, 6.5, 1), (0x16, "U", 1, 7.5, 1), (0x17, "I", 1, 8.5, 1),
+        (0x18, "O", 1, 9.5, 1), (0x19, "P", 1, 10.5, 1), (0x1A, "[", 1, 11.5, 1), (0x1B, "]", 1, 12.5, 1),
+        (0x2B, "\\", 1, 13.5, 1.5),
+        # Home row
+        (0x3A, "Caps", 2, 0, 1.75),
+        (0x1E, "A", 2, 1.75, 1), (0x1F, "S", 2, 2.75, 1), (0x20, "D", 2, 3.75, 1), (0x21, "F", 2, 4.75, 1),
+        (0x22, "G", 2, 5.75, 1), (0x23, "H", 2, 6.75, 1), (0x24, "J", 2, 7.75, 1), (0x25, "K", 2, 8.75, 1),
+        (0x26, "L", 2, 9.75, 1), (0x27, ";", 2, 10.75, 1), (0x28, "'", 2, 11.75, 1),
+        (0x1C, "Enter", 2, 12.75, 2.25),
+        # Shift row
+        (0x2A, "Shift", 3, 0, 2.25),
+        (0x2C, "Z", 3, 2.25, 1), (0x2D, "X", 3, 3.25, 1), (0x2E, "C", 3, 4.25, 1), (0x2F, "V", 3, 5.25, 1),
+        (0x30, "B", 3, 6.25, 1), (0x31, "N", 3, 7.25, 1), (0x32, "M", 3, 8.25, 1), (0x33, ",", 3, 9.25, 1),
+        (0x34, ".", 3, 10.25, 1), (0x35, "/", 3, 11.25, 1),
+        (0x36, "Shift", 3, 12.25, 2.75),
+        # Bottom row
+        (0x1D, "Ctrl", 4, 0, 1.25), (0x5B, "Win", 4, 1.25, 1.25), (0x38, "Alt", 4, 2.5, 1.25),
+        (0x39, "Space", 4, 3.75, 6.25),
+        (0x138, "Alt", 4, 10, 1.25), (0x15B, "Win", 4, 11.25, 1.25),
+        (0x15D, "Menu", 4, 12.5, 1.25), (0x11D, "Ctrl", 4, 13.75, 1.25),
+    ],
+}
+
+# Default layout for backward compatibility
+KEYBOARD_LAYOUT = KEYBOARD_LAYOUTS['tkl']
+
+def get_keyboard_layout(layout_name: str = 'tkl') -> list:
+    """Get keyboard layout by name.
+    
+    Args:
+        layout_name: One of 'full', 'tkl', '75', '60'
+    
+    Returns:
+        List of key tuples (scan_code, label, row, col, width)
+    """
+    return KEYBOARD_LAYOUTS.get(layout_name, KEYBOARD_LAYOUTS['tkl'])
+
 
 def get_heat_color(ratio, theme='default'):
     """Get color based on heat ratio (0.0 to 1.0).
@@ -71,10 +200,11 @@ def get_heat_color(ratio, theme='default'):
 
 
 class HeatmapWidget(QWidget):
-    def __init__(self, data=None, theme='default'):
+    def __init__(self, data=None, theme='default', layout_name='tkl'):
         super().__init__()
         self.data = data or {}
         self.theme = theme
+        self.layout_name = layout_name
         self.setMinimumSize(800, 450)
         self.base_key_size = 45
         self.key_spacing = 3
@@ -84,6 +214,12 @@ class HeatmapWidget(QWidget):
         """Set the heatmap color theme."""
         self.theme = theme
         self.update()
+    
+    def set_layout(self, layout_name):
+        """Set the keyboard layout to display."""
+        if layout_name in KEYBOARD_LAYOUTS:
+            self.layout_name = layout_name
+            self.update()
 
     def update_data(self, data):
         self.data = data
@@ -96,6 +232,9 @@ class HeatmapWidget(QWidget):
         # Background
         painter.fillRect(self.rect(), QColor(40, 40, 40))
         
+        # Get current layout
+        layout = get_keyboard_layout(self.layout_name)
+        
         if not self.data:
             painter.setPen(QColor(200, 200, 200))
             painter.setFont(QFont("Arial", 14))
@@ -103,8 +242,14 @@ class HeatmapWidget(QWidget):
             return
         
         # Calculate total size of keyboard in base units
-        max_col_units = max(col + width for _, _, _, col, width in KEYBOARD_LAYOUT)
-        max_row_units = max(row + 1 for _, _, row, _, _ in KEYBOARD_LAYOUT)
+        # Handle both 5-tuple (legacy) and 6-tuple (with height) formats
+        max_col_units = 0
+        max_row_units = 0
+        for key_tuple in layout:
+            _, _, row, col, width = key_tuple[:5]
+            height = key_tuple[5] if len(key_tuple) > 5 else 1
+            max_col_units = max(max_col_units, col + width)
+            max_row_units = max(max_row_units, row + height)
         
         # Calculate scale factor to fit the widget while maintaining aspect ratio
         base_total_w = max_col_units * self.base_key_size + (max_col_units - 1) * self.key_spacing
@@ -114,7 +259,9 @@ class HeatmapWidget(QWidget):
         available_h = self.height() - 2 * self.margin
         
         scale = min(available_w / base_total_w, available_h / base_total_h)
-        scale = max(scale, 1.0)  # Don't shrink below base size
+        # Allow shrinking to avoid clipping on smaller windows.
+        # Keep a reasonable lower bound so labels remain legible.
+        scale = max(scale, 0.6)
         
         key_size = self.base_key_size * scale
         spacing = self.key_spacing * scale
@@ -134,11 +281,14 @@ class HeatmapWidget(QWidget):
         count_font_size = max(6, int(7 * scale))
         corner_radius = int(5 * scale)
         
-        for scan_code, label, row, col, width in KEYBOARD_LAYOUT:
+        for key_tuple in layout:
+            scan_code, label, row, col, width = key_tuple[:5]
+            height = key_tuple[5] if len(key_tuple) > 5 else 1
+            
             x = start_x + col * (key_size + spacing)
             y = start_y + row * (key_size + spacing)
             w = width * key_size + (width - 1) * spacing
-            h = key_size
+            h = height * key_size + (height - 1) * spacing
             
             # Get heat level
             count = self.data.get(scan_code, 0)

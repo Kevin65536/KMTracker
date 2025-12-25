@@ -13,6 +13,7 @@ DEFAULT_CONFIG = {
     'autostart': False,
     'data_retention_days': 365,  # -1 means keep forever
     'heatmap_theme': 'default',  # 'default', 'fire', 'ocean', 'monochrome'
+    'keyboard_layout': 'tkl',  # 'full', 'tkl', '75', '60'
     'minimize_to_tray': True,
     'show_notifications': True,
     'language': 'en',  # 'en' for English, 'zh' for Chinese
@@ -118,6 +119,15 @@ class Config:
     @heatmap_theme.setter
     def heatmap_theme(self, value):
         self._config['heatmap_theme'] = value
+        self.save()
+    
+    @property
+    def keyboard_layout(self):
+        return self._config.get('keyboard_layout', 'tkl')
+    
+    @keyboard_layout.setter
+    def keyboard_layout(self, value):
+        self._config['keyboard_layout'] = value
         self.save()
     
     @property

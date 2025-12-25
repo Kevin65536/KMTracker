@@ -14,6 +14,14 @@ from PySide6.QtGui import QFont, QColor, QPainter, QPen
 from ..config import Config, HEATMAP_THEMES, get_theme_color
 from ..i18n import tr, get_i18n, get_supported_languages, set_language
 
+# Available keyboard layouts
+KEYBOARD_LAYOUT_OPTIONS = {
+    'full': 'layout.full',
+    'tkl': 'layout.tkl',
+    '75': 'layout.75',
+    '60': 'layout.60',
+}
+
 
 class ColorPreviewWidget(QWidget):
     """Widget to preview heatmap color gradient."""
@@ -53,6 +61,7 @@ class SettingsWidget(QWidget):
     
     # Signal emitted when theme changes (for live preview)
     theme_changed = Signal(str)
+    keyboard_layout_changed = Signal(str)
     settings_changed = Signal()
     language_changed = Signal(str)
     
@@ -417,6 +426,27 @@ class SettingsWidget(QWidget):
         
         appearance_layout.addLayout(preview_layout)
         
+        appearance_layout.addSpacing(10)
+        
+        # Keyboard layout selector
+        kb_layout_row = QHBoxLayout()
+        self.kb_layout_label = QLabel(tr('settings.keyboard_layout'))
+        self.kb_layout_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        kb_layout_row.addWidget(self.kb_layout_label)
+        
+        self.kb_layout_combo = QComboBox()
+        self.kb_layout_combo.setMinimumWidth(280)
+        
+        # Add keyboard layouts to combo
+        for layout_key, layout_i18n_key in KEYBOARD_LAYOUT_OPTIONS.items():
+            self.kb_layout_combo.addItem(tr(layout_i18n_key), layout_key)
+        
+        self.kb_layout_combo.currentIndexChanged.connect(self.on_keyboard_layout_changed)
+        kb_layout_row.addWidget(self.kb_layout_combo)
+        kb_layout_row.addStretch()
+        
+        appearance_layout.addLayout(kb_layout_row)
+        
         self.appearance_group.setLayout(appearance_layout)
         scroll_layout.addWidget(self.appearance_group)
         
@@ -465,6 +495,7 @@ class SettingsWidget(QWidget):
         self.language_hint.setText(tr('settings.language_hint'))
         self.theme_label.setText(tr('settings.theme'))
         self.preview_label.setText(tr('settings.preview'))
+        self.kb_layout_label.setText(tr('settings.keyboard_layout'))
         
         # Update theme combo items
         current_theme = self.theme_combo.currentData()
@@ -478,6 +509,18 @@ class SettingsWidget(QWidget):
                 self.theme_combo.setCurrentIndex(i)
                 break
         self.theme_combo.blockSignals(False)
+        
+        # Update keyboard layout combo items
+        current_kb_layout = self.kb_layout_combo.currentData()
+        self.kb_layout_combo.blockSignals(True)
+        self.kb_layout_combo.clear()
+        for layout_key, layout_i18n_key in KEYBOARD_LAYOUT_OPTIONS.items():
+            self.kb_layout_combo.addItem(tr(layout_i18n_key), layout_key)
+        for i in range(self.kb_layout_combo.count()):
+            if self.kb_layout_combo.itemData(i) == current_kb_layout:
+                self.kb_layout_combo.setCurrentIndex(i)
+                break
+        self.kb_layout_combo.blockSignals(False)
     
     def load_settings(self):
         """Load current settings into UI controls."""
@@ -486,6 +529,7 @@ class SettingsWidget(QWidget):
         self.minimize_tray_check.blockSignals(True)
         self.retention_spin.blockSignals(True)
         self.theme_combo.blockSignals(True)
+        self.kb_layout_combo.blockSignals(True)
         self.language_combo.blockSignals(True)
         self.idle_timeout_spin.blockSignals(True)
         
@@ -514,11 +558,19 @@ class SettingsWidget(QWidget):
         
         self.theme_preview.set_theme(current_theme)
         
+        # Set keyboard layout combo
+        current_kb_layout = self.config.keyboard_layout
+        for i in range(self.kb_layout_combo.count()):
+            if self.kb_layout_combo.itemData(i) == current_kb_layout:
+                self.kb_layout_combo.setCurrentIndex(i)
+                break
+        
         # Unblock signals
         self.autostart_check.blockSignals(False)
         self.minimize_tray_check.blockSignals(False)
         self.retention_spin.blockSignals(False)
         self.theme_combo.blockSignals(False)
+        self.kb_layout_combo.blockSignals(False)
         self.language_combo.blockSignals(False)
         self.idle_timeout_spin.blockSignals(False)
     
@@ -584,6 +636,13 @@ class SettingsWidget(QWidget):
         self.config.heatmap_theme = theme_key
         self.theme_preview.set_theme(theme_key)
         self.theme_changed.emit(theme_key)
+        self.settings_changed.emit()
+    
+    def on_keyboard_layout_changed(self, index):
+        """Handle keyboard layout combo change."""
+        layout_key = self.kb_layout_combo.itemData(index)
+        self.config.keyboard_layout = layout_key
+        self.keyboard_layout_changed.emit(layout_key)
         self.settings_changed.emit()
     
     def on_clear_data(self):

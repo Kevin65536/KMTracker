@@ -2,6 +2,7 @@
   "autostart": true,
   "data_retention_days": -1,
   "heatmap_theme": "default",
+  "keyboard_layout": "60",
   "minimize_to_tray": true,
   "show_notifications": false,
   "language": "en",
