@@ -852,8 +852,8 @@ class MainWindow(QMainWindow):
                     for key, count in app_buffer.items():
                         heatmap_data[key] = heatmap_data.get(key, 0) + count
                 else:
-                    # Get global buffer
-                    buffer = snapshot.get('heatmap', {})
+                    # Get global buffer (use buffer_heatmap, not 'heatmap' which includes DB data)
+                    buffer = snapshot.get('buffer_heatmap', {})
                     for key, count in buffer.items():
                         heatmap_data[key] = heatmap_data.get(key, 0) + count
             
