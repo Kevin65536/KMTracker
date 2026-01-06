@@ -357,7 +357,7 @@ class AppTimeTable(QWidget):
 
 
 class AppTimePieChart(QWidget):
-    """Pie chart showing app screen time distribution."""
+    """Pie chart showing app screen time distribution. Click to toggle idle time."""
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -378,12 +378,27 @@ class AppTimePieChart(QWidget):
         
         self.metadata = {}
         
+        # State for idle toggle
+        self.show_idle = True  # Default: show idle time
+        self._cached_app_data = []
+        self._cached_total_seconds = 0
+        
         # Color palette
         self.colors = [
             "#00e676", "#2196f3", "#ff9800", "#e91e63", "#9c27b0",
             "#00bcd4", "#8bc34a", "#ffc107", "#f44336", "#673ab7",
             "#03a9f4", "#4caf50", "#ff5722", "#795548", "#607d8b"
         ]
+        
+        # Enable mouse tracking and click detection
+        self.chart_view.setMouseTracking(True)
+        self.chart_view.setCursor(Qt.PointingHandCursor)
+        self.chart_view.mousePressEvent = self._on_chart_clicked
+    
+    def _on_chart_clicked(self, event):
+        """Handle click on the chart to toggle idle time display."""
+        self.show_idle = not self.show_idle
+        self._redraw_chart()
     
     def set_metadata(self, metadata):
         self.metadata = metadata or {}
@@ -393,7 +408,26 @@ class AppTimePieChart(QWidget):
         Update pie chart with app data.
         app_data: list of (app_name, seconds), sorted by seconds desc
         """
+        # Cache the data for toggle functionality
+        self._cached_app_data = list(app_data)
+        self._cached_total_seconds = total_seconds
+        self._redraw_chart()
+    
+    def _redraw_chart(self):
+        """Redraw the chart based on current show_idle state."""
         self.chart.removeAllSeries()
+        
+        # Filter data based on show_idle state
+        if self.show_idle:
+            app_data = self._cached_app_data
+            total_seconds = self._cached_total_seconds
+        else:
+            # Exclude idle time
+            app_data = [(app, secs) for app, secs in self._cached_app_data if app != '[Idle]']
+            total_seconds = sum(secs for _, secs in app_data)
+        
+        if not app_data or total_seconds <= 0:
+            return
         
         series = QPieSeries()
         
@@ -401,6 +435,7 @@ class AppTimePieChart(QWidget):
         top_apps = app_data[:10]
         others_seconds = sum(s for _, s in app_data[10:]) if len(app_data) > 10 else 0
         
+        color_index = 0
         for i, (app_name, seconds) in enumerate(top_apps):
             if seconds <= 0:
                 continue
@@ -417,7 +452,8 @@ class AppTimePieChart(QWidget):
                     display_name = app_name[:-4] if app_name.lower().endswith('.exe') else app_name
                 
                 slice = series.append(display_name, seconds)
-                slice.setColor(QColor(self.colors[i % len(self.colors)]))
+                slice.setColor(QColor(self.colors[color_index % len(self.colors)]))
+                color_index += 1
             
             slice.setLabelVisible(False)
         

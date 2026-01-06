@@ -103,6 +103,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'screen_time.idle': 'Idle',
         'screen_time.total_active': 'Active Time',
         'screen_time.total_idle': 'Idle Time',
+        'screen_time.click_toggle_idle': 'Click chart to hide idle time',
+        'screen_time.click_hide_idle': 'Click chart to hide idle time',
+        'screen_time.click_show_idle': 'Click chart to show idle time',
         
         # Settings
         'settings.title': 'Settings',
@@ -252,6 +255,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'screen_time.idle': '空闲',
         'screen_time.total_active': '活跃时间',
         'screen_time.total_idle': '空闲时间',
+        'screen_time.click_toggle_idle': '点击图表隐藏空闲时间',
+        'screen_time.click_hide_idle': '点击图表隐藏空闲时间',
+        'screen_time.click_show_idle': '点击图表显示空闲时间',
         
         # Settings
         'settings.title': '设置',
