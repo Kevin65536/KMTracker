@@ -32,8 +32,10 @@ A privacy-focused, lightweight input tracking tool for Windows. Inspired by What
 ✨ **6 Comprehensive Tabs** - Dashboard, Heatmap, Applications, History, Screen Time, and Settings  
 🎨 **5 Heatmap Themes** - Classic, Fire, Ocean, Purple, and Matrix color schemes  
 📊 **Advanced Analytics** - Timeline and Insights charts with weekday/hourly patterns  
-⏱️ **Screen Time Tracking** - Monitor foreground application usage time  
+⏱️ **Screen Time Tracking** - Monitor foreground application usage time with idle detection  
 🎯 **Per-App Filtering** - Filter heatmaps and statistics by specific applications  
+🌐 **Multi-Language Support** - English and Chinese interface support  
+⌨️ **Keyboard Layout Support** - Compatible with different keyboard layouts  
 🔒 **100% Private** - All data stored locally, no cloud sync or telemetry
 
 ## Features
@@ -41,26 +43,29 @@ A privacy-focused, lightweight input tracking tool for Windows. Inspired by What
 ### 📊 Input Tracking
 - **Keyboard Heatmap**: Visualize your most used keys with a color-coded keyboard overlay
   - Multiple color themes (Classic, Fire, Ocean, Purple, Matrix)
-  - Time range filtering (Today, Week, Month, Year, All Time)
+  - Time range filtering (Today, Yesterday, Week, Month, Year, All Time)
   - Per-application keyboard heatmap filtering
+  - Keyboard layout support for different physical keyboard configurations
 - **Mouse Heatmap**: Track click density across multiple monitors
   - Smooth gradient visualization with Gaussian blur
   - Accurate screen positioning and multi-monitor support
   - Per-application mouse heatmap filtering
+  - Smart filtering: only shows apps used in selected time period
 - **Input Statistics**:
   - Track total keystrokes and mouse clicks
+  - Accurate key press counting (prevents long-press duplicates)
   - Calculate mouse travel distance in meters (with accurate physical screen size detection)
   - Calculate scroll wheel usage (in scroll steps)
   - Real-time statistics updates
 
 ### 📈 History & Analytics
 - **Timeline View**: Interactive charts showing daily/hourly input trends
-  - Timeline graphs for Today/Week/Month/Year
+  - Timeline graphs for Today/Yesterday/Week/Month/Year
   - Combined bar and line charts with dark theme support
 - **Insights View**: Statistical analysis of your usage patterns
   - Weekday distribution (average inputs per day of week)
   - Hourly distribution (average inputs by hour of day)
-- **Time Range Filtering**: View statistics for Today, Week, Month, Year, or All Time
+- **Time Range Filtering**: View statistics for Today, Yesterday, Week, Month, Year, or All Time
 
 ### 💻 Application Tracking
 - **Application Statistics**: Comprehensive per-app usage tracking
@@ -74,12 +79,17 @@ A privacy-focused, lightweight input tracking tool for Windows. Inspired by What
 ### ⏱️ Screen Time Monitoring
 - **Foreground Time Tracking**: Monitor how much time you spend in each application
   - Total screen time and daily average calculations
+  - Idle time detection and tracking
   - Most used application display
   - Detailed breakdown table with percentages
-  - Visual pie chart distribution
+  - Interactive pie chart distribution with click-to-toggle feature
+    - Switch between idle time included/excluded views by clicking the chart
   - Time range filtering support
+  - Robust overnight session tracking
 
 ### ⚙️ Settings & Customization
+- **Language Options**: Switch between English and Chinese interface
+- **Keyboard Layout**: Configure keyboard layout for accurate heatmap display
 - **Startup Options**: Start with Windows automatically
 - **Tray Behavior**: Minimize to system tray option
 - **Data Management**: Configure data retention period (7-365 days or forever)
@@ -137,12 +147,12 @@ Pre-compiled Windows executables are available in the [Releases](https://github.
 
 2.  The application will start, and a system tray icon will appear.
 3.  Use the different tabs to view your statistics:
-    - **Dashboard**: Quick overview with time range selection (Today/Week/Month/Year/All Time)
+    - **Dashboard**: Quick overview with time range selection (Today/Yesterday/Week/Month/Year/All Time)
     - **Heatmap**: Keyboard and Mouse heatmaps with per-app filtering and theme customization
     - **Applications**: Detailed per-app statistics (table and pie chart views)
     - **History**: Timeline and Insights charts showing usage trends and patterns
-    - **Screen Time**: Application foreground time tracking with distribution charts
-    - **Settings**: Customize startup behavior, data retention, and heatmap themes
+    - **Screen Time**: Application foreground time tracking with idle detection and interactive distribution charts
+    - **Settings**: Customize language, keyboard layout, startup behavior, data retention, and heatmap themes
 
 ## Privacy Note
 
@@ -154,6 +164,7 @@ This tool uses low-level system hooks (`SetWindowsHookEx`) to count keystrokes a
 - Mouse movement distance (calculated from pixel distance and physical screen size)
 - Scroll wheel usage count
 - Active foreground application names and usage time
+- Idle time periods (when no input is detected)
 
 **What we DON'T track:**
 - Actual text or passwords you type (no keylogging)
