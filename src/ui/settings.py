@@ -3,16 +3,19 @@ Settings page UI for ActivityTrack.
 Provides controls for autostart, data retention, theme selection, etc.
 """
 
+import os
+import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QCheckBox, QComboBox, QSpinBox, QPushButton, QGroupBox,
-    QFormLayout, QMessageBox, QScrollArea, QSizePolicy
+    QFormLayout, QMessageBox, QScrollArea, QSizePolicy, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QColor, QPainter, QPen
 
 from ..config import Config, HEATMAP_THEMES, get_theme_color
 from ..i18n import tr, get_i18n, get_supported_languages, set_language
+from ..exporter import DataExporter
 
 # Available keyboard layouts
 KEYBOARD_LAYOUT_OPTIONS = {
@@ -69,6 +72,7 @@ class SettingsWidget(QWidget):
         super().__init__()
         self.config = config or Config()
         self.database = database
+        self.exporter = DataExporter(database) if database else None
         self.setup_ui()
         self.load_settings()
     
@@ -234,6 +238,21 @@ class SettingsWidget(QWidget):
             }
             QPushButton#clearDataBtn:pressed {
                 background-color: #b71c1c;
+            }
+            QPushButton.exportBtn {
+                background-color: #1976d2;
+                color: #ffffff;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton.exportBtn:hover {
+                background-color: #1e88e5;
+            }
+            QPushButton.exportBtn:pressed {
+                background-color: #1565c0;
             }
         """)
         
@@ -450,6 +469,62 @@ class SettingsWidget(QWidget):
         self.appearance_group.setLayout(appearance_layout)
         scroll_layout.addWidget(self.appearance_group)
         
+        # Data Export Group
+        self.export_group = self.create_group(tr('settings.export'))
+        export_layout = QVBoxLayout()
+        export_layout.setSpacing(15)
+        
+        # Export range selector
+        export_range_layout = QHBoxLayout()
+        self.export_range_label = QLabel(tr('settings.export_range'))
+        self.export_range_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        export_range_layout.addWidget(self.export_range_label)
+        
+        self.export_range_combo = QComboBox()
+        self.export_range_combo.setMinimumWidth(150)
+        self.export_range_combo.addItem(tr('time.today'), 'today')
+        self.export_range_combo.addItem(tr('time.week'), 'week')
+        self.export_range_combo.addItem(tr('time.month'), 'month')
+        self.export_range_combo.addItem(tr('time.year'), 'year')
+        self.export_range_combo.addItem(tr('time.all'), 'all')
+        self.export_range_combo.setCurrentIndex(4)  # Default to "All Time"
+        export_range_layout.addWidget(self.export_range_combo)
+        export_range_layout.addStretch()
+        export_layout.addLayout(export_range_layout)
+        
+        export_layout.addSpacing(5)
+        
+        # Export CSV button
+        csv_layout = QHBoxLayout()
+        self.export_csv_label = QLabel(tr('settings.export_csv'))
+        self.export_csv_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        csv_layout.addWidget(self.export_csv_label)
+        
+        self.export_csv_btn = QPushButton(tr('settings.export_csv_btn'))
+        self.export_csv_btn.setProperty("class", "exportBtn")
+        self.export_csv_btn.setFixedWidth(120)
+        self.export_csv_btn.clicked.connect(self.on_export_csv)
+        csv_layout.addWidget(self.export_csv_btn)
+        csv_layout.addStretch()
+        export_layout.addLayout(csv_layout)
+        
+        # Export JSON button
+        json_layout = QHBoxLayout()
+        self.export_json_label = QLabel(tr('settings.export_json'))
+        self.export_json_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        json_layout.addWidget(self.export_json_label)
+        
+        self.export_json_btn = QPushButton(tr('settings.export_json_btn'))
+        self.export_json_btn.setProperty("class", "exportBtn")
+        self.export_json_btn.setFixedWidth(120)
+        self.export_json_btn.clicked.connect(self.on_export_json)
+        json_layout.addWidget(self.export_json_btn)
+        json_layout.addStretch()
+        export_layout.addLayout(json_layout)
+        
+        self.export_group.setLayout(export_layout)
+        scroll_layout.addWidget(self.export_group)
+        
         # Add stretch at the end
         scroll_layout.addStretch()
         
@@ -521,6 +596,29 @@ class SettingsWidget(QWidget):
                 self.kb_layout_combo.setCurrentIndex(i)
                 break
         self.kb_layout_combo.blockSignals(False)
+        
+        # Export group
+        self.export_group.setTitle(tr('settings.export'))
+        self.export_range_label.setText(tr('settings.export_range'))
+        self.export_csv_label.setText(tr('settings.export_csv'))
+        self.export_csv_btn.setText(tr('settings.export_csv_btn'))
+        self.export_json_label.setText(tr('settings.export_json'))
+        self.export_json_btn.setText(tr('settings.export_json_btn'))
+        
+        # Update export range combo items
+        current_export_range = self.export_range_combo.currentData()
+        self.export_range_combo.blockSignals(True)
+        self.export_range_combo.clear()
+        self.export_range_combo.addItem(tr('time.today'), 'today')
+        self.export_range_combo.addItem(tr('time.week'), 'week')
+        self.export_range_combo.addItem(tr('time.month'), 'month')
+        self.export_range_combo.addItem(tr('time.year'), 'year')
+        self.export_range_combo.addItem(tr('time.all'), 'all')
+        for i in range(self.export_range_combo.count()):
+            if self.export_range_combo.itemData(i) == current_export_range:
+                self.export_range_combo.setCurrentIndex(i)
+                break
+        self.export_range_combo.blockSignals(False)
     
     def load_settings(self):
         """Load current settings into UI controls."""
@@ -703,3 +801,108 @@ class SettingsWidget(QWidget):
                 tr('dialog.clear_data.warning_title'),
                 tr('dialog.clear_data.warning_message')
             )
+    
+    def _get_export_date_range(self):
+        """Get the date range based on export range selector."""
+        range_key = self.export_range_combo.currentData()
+        today = datetime.date.today()
+        
+        if range_key == 'today':
+            return today, today
+        elif range_key == 'week':
+            return today - datetime.timedelta(days=6), today
+        elif range_key == 'month':
+            return today - datetime.timedelta(days=29), today
+        elif range_key == 'year':
+            return today - datetime.timedelta(days=364), today
+        else:  # 'all'
+            return None, None
+    
+    def on_export_csv(self):
+        """Handle export CSV button click."""
+        if not self.exporter:
+            QMessageBox.warning(
+                self,
+                tr('dialog.export.error_title'),
+                tr('dialog.export.error_message', error='Database not available')
+            )
+            return
+        
+        # Select folder
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            tr('dialog.export.select_folder'),
+            os.path.expanduser('~')
+        )
+        
+        if folder:
+            try:
+                start_date, end_date = self._get_export_date_range()
+                results = self.exporter.export_all_csv(folder, start_date, end_date)
+                
+                if all(results.values()):
+                    QMessageBox.information(
+                        self,
+                        tr('dialog.export.success_title'),
+                        tr('dialog.export.success_message', path=folder)
+                    )
+                else:
+                    failed = [k for k, v in results.items() if not v]
+                    QMessageBox.warning(
+                        self,
+                        tr('dialog.export.error_title'),
+                        tr('dialog.export.error_message', error=f'Failed: {", ".join(failed)}')
+                    )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    tr('dialog.export.error_title'),
+                    tr('dialog.export.error_message', error=str(e))
+                )
+    
+    def on_export_json(self):
+        """Handle export JSON button click."""
+        if not self.exporter:
+            QMessageBox.warning(
+                self,
+                tr('dialog.export.error_title'),
+                tr('dialog.export.error_message', error='Database not available')
+            )
+            return
+        
+        # Generate default filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"activitytrack_export_{timestamp}.json"
+        
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            tr('dialog.export.save_json'),
+            os.path.join(os.path.expanduser('~'), default_name),
+            "JSON Files (*.json)"
+        )
+        
+        if filepath:
+            try:
+                start_date, end_date = self._get_export_date_range()
+                success = self.exporter.export_json(filepath, start_date, end_date)
+                
+                if success:
+                    QMessageBox.information(
+                        self,
+                        tr('dialog.export.success_title'),
+                        tr('dialog.export.success_message', path=filepath)
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        tr('dialog.export.error_title'),
+                        tr('dialog.export.error_message', error='Export failed')
+                    )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    tr('dialog.export.error_title'),
+                    tr('dialog.export.error_message', error=str(e))
+                )
+    
+

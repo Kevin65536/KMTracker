@@ -167,6 +167,24 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'tray.show': 'Show Dashboard',
         'tray.quit': 'Quit',
         'tray.tooltip': 'ActivityTrack',
+        
+        # Export
+        'settings.export': 'Data Export',
+        'settings.export_csv': 'Export to CSV files:',
+        'settings.export_csv_btn': 'Export CSV',
+        'settings.export_json': 'Export to JSON file:',
+        'settings.export_json_btn': 'Export JSON',
+        'settings.export_all': 'Export all data:',
+        'settings.export_all_btn': 'Export All',
+        'settings.export_range': 'Export range:',
+        'dialog.export.success_title': 'Export Successful',
+        'dialog.export.success_message': 'Data has been exported successfully to:\n{path}',
+        'dialog.export.error_title': 'Export Error',
+        'dialog.export.error_message': 'Failed to export data: {error}',
+        'dialog.export.select_folder': 'Select Export Folder',
+        'dialog.export.save_csv': 'Save CSV File',
+        'dialog.export.save_json': 'Save JSON File',
+        'dialog.export.save_image': 'Save Image File',
     },
     
     'zh': {
@@ -319,6 +337,24 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'tray.show': '显示主界面',
         'tray.quit': '退出',
         'tray.tooltip': 'ActivityTrack',
+        
+        # Export
+        'settings.export': '数据导出',
+        'settings.export_csv': '导出为 CSV 文件：',
+        'settings.export_csv_btn': '导出 CSV',
+        'settings.export_json': '导出为 JSON 文件：',
+        'settings.export_json_btn': '导出 JSON',
+        'settings.export_all': '导出所有数据：',
+        'settings.export_all_btn': '全部导出',
+        'settings.export_range': '导出范围：',
+        'dialog.export.success_title': '导出成功',
+        'dialog.export.success_message': '数据已成功导出到：\n{path}',
+        'dialog.export.error_title': '导出错误',
+        'dialog.export.error_message': '导出数据失败：{error}',
+        'dialog.export.select_folder': '选择导出文件夹',
+        'dialog.export.save_csv': '保存 CSV 文件',
+        'dialog.export.save_json': '保存 JSON 文件',
+        'dialog.export.save_image': '保存图片文件',
     }
 }
 
