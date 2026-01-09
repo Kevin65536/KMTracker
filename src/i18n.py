@@ -145,6 +145,28 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'break_reminder.title': 'Time for a Break! 🧘',
         'break_reminder.message': "You've been using your computer for {minutes} minutes. Consider taking a {break_duration}-minute break to rest your eyes and stretch.",
         
+        # App grouping
+        'settings.app_grouping': 'App Grouping',
+        'settings.app_grouping_desc': 'Categorize your applications into productivity and other groups for better time tracking insights.',
+        'settings.manage_groups': 'Manage app groups:',
+        'settings.open_grouping': 'Open Grouping',
+        'settings.grouping_stats': 'Productivity: {productivity} apps | Other: {other} apps',
+        
+        # App grouping dialog
+        'grouping.title': 'App Grouping',
+        'grouping.description': 'Drag applications between lists or use the buttons to categorize them. Productivity apps are work-related, while Other includes entertainment and leisure apps.',
+        'grouping.search': 'Search:',
+        'grouping.search_placeholder': 'Filter apps...',
+        'grouping.unassigned': 'Unassigned',
+        'grouping.productivity': 'Productivity',
+        'grouping.other': 'Other',
+        'grouping.to_productivity': 'Productivity',
+        'grouping.to_other': 'Other',
+        'grouping.unassign': 'Unassign',
+        'grouping.save': 'Save',
+        'grouping.cancel': 'Cancel',
+        'grouping.stats': 'Total: {total} apps | Productivity: {productivity} | Other: {other} | Unassigned: {unassigned}',
+        
         # Theme names
         'theme.default': 'Default (Blue → Green → Yellow → Orange)',
         'theme.fire': 'Fire (Black → Red → Yellow → White)',
@@ -327,6 +349,28 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # Break reminder notifications
         'break_reminder.title': '该休息一下了！🧘',
         'break_reminder.message': '您已连续使用电脑 {minutes} 分钟。建议休息 {break_duration} 分钟，让眼睛休息一下，活动活动身体。',
+        
+        # App grouping
+        'settings.app_grouping': '应用分组',
+        'settings.app_grouping_desc': '将应用程序分类为生产力和其他类别，以获得更好的时间追踪洞察。',
+        'settings.manage_groups': '管理应用分组：',
+        'settings.open_grouping': '打开分组',
+        'settings.grouping_stats': '生产力：{productivity} 个应用 | 其他：{other} 个应用',
+        
+        # App grouping dialog
+        'grouping.title': '应用分组',
+        'grouping.description': '使用按钮将应用程序分类到不同组别。生产力应用包括工作相关的软件，其他则包括娱乐和休闲应用。',
+        'grouping.search': '搜索：',
+        'grouping.search_placeholder': '筛选应用...',
+        'grouping.unassigned': '未分组',
+        'grouping.productivity': '生产力',
+        'grouping.other': '其他',
+        'grouping.to_productivity': '生产力',
+        'grouping.to_other': '其他',
+        'grouping.unassign': '取消分组',
+        'grouping.save': '保存',
+        'grouping.cancel': '取消',
+        'grouping.stats': '总计：{total} 个应用 | 生产力：{productivity} | 其他：{other} | 未分组：{unassigned}',
         
         # Theme names
         'theme.default': '默认（蓝 → 绿 → 黄 → 橙）',

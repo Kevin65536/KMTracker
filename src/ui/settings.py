@@ -16,6 +16,7 @@ from PySide6.QtGui import QFont, QColor, QPainter, QPen
 from ..config import Config, HEATMAP_THEMES, get_theme_color
 from ..i18n import tr, get_i18n, get_supported_languages, set_language
 from ..exporter import DataExporter
+from .app_grouping import AppGroupingDialog
 
 # Available keyboard layouts
 KEYBOARD_LAYOUT_OPTIONS = {
@@ -521,6 +522,39 @@ class SettingsWidget(QWidget):
         self.appearance_group.setLayout(appearance_layout)
         scroll_layout.addWidget(self.appearance_group)
         
+        # App Grouping Section
+        self.grouping_group = self.create_group(tr('settings.app_grouping'))
+        grouping_layout = QVBoxLayout()
+        grouping_layout.setSpacing(15)
+        
+        # Description
+        self.grouping_desc = QLabel(tr('settings.app_grouping_desc'))
+        self.grouping_desc.setWordWrap(True)
+        self.grouping_desc.setStyleSheet("color: #888888; font-size: 12px; background-color: transparent;")
+        grouping_layout.addWidget(self.grouping_desc)
+        
+        # Button to open grouping dialog
+        grouping_btn_layout = QHBoxLayout()
+        self.grouping_label = QLabel(tr('settings.manage_groups'))
+        self.grouping_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        grouping_btn_layout.addWidget(self.grouping_label)
+        
+        self.grouping_btn = QPushButton(tr('settings.open_grouping'))
+        self.grouping_btn.setProperty("class", "exportBtn")
+        self.grouping_btn.setFixedWidth(140)
+        self.grouping_btn.clicked.connect(self.on_open_grouping)
+        grouping_btn_layout.addWidget(self.grouping_btn)
+        grouping_btn_layout.addStretch()
+        grouping_layout.addLayout(grouping_btn_layout)
+        
+        # Show current stats
+        self.grouping_stats = QLabel(self._get_grouping_stats())
+        self.grouping_stats.setStyleSheet("color: #aaaaaa; font-size: 12px; background-color: transparent;")
+        grouping_layout.addWidget(self.grouping_stats)
+        
+        self.grouping_group.setLayout(grouping_layout)
+        scroll_layout.addWidget(self.grouping_group)
+        
         # Data Export Group
         self.export_group = self.create_group(tr('settings.export'))
         export_layout = QVBoxLayout()
@@ -658,6 +692,13 @@ class SettingsWidget(QWidget):
                 self.kb_layout_combo.setCurrentIndex(i)
                 break
         self.kb_layout_combo.blockSignals(False)
+        
+        # App grouping group
+        self.grouping_group.setTitle(tr('settings.app_grouping'))
+        self.grouping_desc.setText(tr('settings.app_grouping_desc'))
+        self.grouping_label.setText(tr('settings.manage_groups'))
+        self.grouping_btn.setText(tr('settings.open_grouping'))
+        self.grouping_stats.setText(self._get_grouping_stats())
         
         # Export group
         self.export_group.setTitle(tr('settings.export'))
@@ -1004,5 +1045,23 @@ class SettingsWidget(QWidget):
                     tr('dialog.export.error_title'),
                     tr('dialog.export.error_message', error=str(e))
                 )
+    
+    def _get_grouping_stats(self):
+        """Get current app grouping statistics text."""
+        groups = self.config.app_groups
+        productivity_count = len(groups.get('productivity', []))
+        other_count = len(groups.get('other', []))
+        return tr('settings.grouping_stats', productivity=productivity_count, other=other_count)
+    
+    def on_open_grouping(self):
+        """Open the app grouping dialog."""
+        dialog = AppGroupingDialog(self.config, self.database, self)
+        dialog.groups_changed.connect(self._update_grouping_stats)
+        dialog.exec()
+    
+    def _update_grouping_stats(self):
+        """Update the grouping stats label after changes."""
+        self.grouping_stats.setText(self._get_grouping_stats())
+        self.settings_changed.emit()
     
 

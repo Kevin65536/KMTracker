@@ -22,6 +22,11 @@ DEFAULT_CONFIG = {
     'break_reminder_enabled': True,  # Enable/disable break reminders
     'break_reminder_interval_minutes': 45,  # Time in minutes before reminder (0 to disable)
     'break_reminder_duration_minutes': 5,  # Suggested break duration in minutes
+    # App grouping settings
+    'app_groups': {
+        'productivity': [],  # List of app names considered productive
+        'other': [],  # List of app names considered other/leisure
+    },
 }
 
 CONFIG_FILE = 'config.json'
@@ -196,6 +201,50 @@ class Config:
     def break_reminder_duration_minutes(self, value):
         self._config['break_reminder_duration_minutes'] = max(1, int(value))
         self.save()
+    
+    @property
+    def app_groups(self):
+        """Get app groups configuration."""
+        return self._config.get('app_groups', {'productivity': [], 'other': []})
+    
+    @app_groups.setter
+    def app_groups(self, value):
+        """Set app groups configuration."""
+        self._config['app_groups'] = value
+        self.save()
+    
+    def get_app_group(self, app_name):
+        """Get the group for a specific app. Returns 'productivity', 'other', or None if unassigned."""
+        groups = self.app_groups
+        if app_name in groups.get('productivity', []):
+            return 'productivity'
+        elif app_name in groups.get('other', []):
+            return 'other'
+        return None
+    
+    def set_app_group(self, app_name, group):
+        """Set the group for a specific app. group should be 'productivity', 'other', or None to remove."""
+        groups = self.app_groups.copy()
+        
+        # Deep copy the lists
+        groups = {
+            'productivity': list(groups.get('productivity', [])),
+            'other': list(groups.get('other', []))
+        }
+        
+        # Remove from all groups first
+        if app_name in groups['productivity']:
+            groups['productivity'].remove(app_name)
+        if app_name in groups['other']:
+            groups['other'].remove(app_name)
+        
+        # Add to the specified group
+        if group == 'productivity':
+            groups['productivity'].append(app_name)
+        elif group == 'other':
+            groups['other'].append(app_name)
+        
+        self.app_groups = groups
     
     @staticmethod
     def is_frozen():
