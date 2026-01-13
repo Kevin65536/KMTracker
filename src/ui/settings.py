@@ -555,6 +555,35 @@ class SettingsWidget(QWidget):
         self.grouping_group.setLayout(grouping_layout)
         scroll_layout.addWidget(self.grouping_group)
         
+        # Screen Time Display Mode Group
+        self.display_mode_group = self.create_group(tr('settings.screen_time_display'))
+        display_mode_layout = QVBoxLayout()
+        display_mode_layout.setSpacing(15)
+        
+        # Description
+        self.display_mode_desc = QLabel(tr('settings.screen_time_display_desc'))
+        self.display_mode_desc.setWordWrap(True)
+        self.display_mode_desc.setStyleSheet("color: #888888; font-size: 12px; background-color: transparent;")
+        display_mode_layout.addWidget(self.display_mode_desc)
+        
+        # Display mode selector
+        display_mode_row = QHBoxLayout()
+        self.display_mode_label = QLabel(tr('settings.display_mode'))
+        self.display_mode_label.setStyleSheet("color: #ffffff; font-size: 14px; background-color: transparent;")
+        display_mode_row.addWidget(self.display_mode_label)
+        
+        self.display_mode_combo = QComboBox()
+        self.display_mode_combo.setMinimumWidth(250)
+        self.display_mode_combo.addItem(tr('settings.display_individual'), False)
+        self.display_mode_combo.addItem(tr('settings.display_grouped'), True)
+        self.display_mode_combo.currentIndexChanged.connect(self.on_display_mode_changed)
+        display_mode_row.addWidget(self.display_mode_combo)
+        display_mode_row.addStretch()
+        display_mode_layout.addLayout(display_mode_row)
+        
+        self.display_mode_group.setLayout(display_mode_layout)
+        scroll_layout.addWidget(self.display_mode_group)
+        
         # Data Export Group
         self.export_group = self.create_group(tr('settings.export'))
         export_layout = QVBoxLayout()
@@ -700,6 +729,23 @@ class SettingsWidget(QWidget):
         self.grouping_btn.setText(tr('settings.open_grouping'))
         self.grouping_stats.setText(self._get_grouping_stats())
         
+        # Screen time display mode group
+        self.display_mode_group.setTitle(tr('settings.screen_time_display'))
+        self.display_mode_desc.setText(tr('settings.screen_time_display_desc'))
+        self.display_mode_label.setText(tr('settings.display_mode'))
+        
+        # Update display mode combo items
+        current_display_mode = self.display_mode_combo.currentData()
+        self.display_mode_combo.blockSignals(True)
+        self.display_mode_combo.clear()
+        self.display_mode_combo.addItem(tr('settings.display_individual'), False)
+        self.display_mode_combo.addItem(tr('settings.display_grouped'), True)
+        for i in range(self.display_mode_combo.count()):
+            if self.display_mode_combo.itemData(i) == current_display_mode:
+                self.display_mode_combo.setCurrentIndex(i)
+                break
+        self.display_mode_combo.blockSignals(False)
+        
         # Export group
         self.export_group.setTitle(tr('settings.export'))
         self.export_range_label.setText(tr('settings.export_range'))
@@ -736,6 +782,7 @@ class SettingsWidget(QWidget):
         self.break_enabled_check.blockSignals(True)
         self.break_interval_spin.blockSignals(True)
         self.break_duration_spin.blockSignals(True)
+        self.display_mode_combo.blockSignals(True)
         
         # Load values from config (trust config file, not registry)
         self.autostart_check.setChecked(self.config.autostart)
@@ -776,6 +823,13 @@ class SettingsWidget(QWidget):
                 self.kb_layout_combo.setCurrentIndex(i)
                 break
         
+        # Set display mode combo
+        current_display_mode = self.config.screen_time_group_display
+        for i in range(self.display_mode_combo.count()):
+            if self.display_mode_combo.itemData(i) == current_display_mode:
+                self.display_mode_combo.setCurrentIndex(i)
+                break
+        
         # Unblock signals
         self.autostart_check.blockSignals(False)
         self.minimize_tray_check.blockSignals(False)
@@ -787,6 +841,7 @@ class SettingsWidget(QWidget):
         self.break_enabled_check.blockSignals(False)
         self.break_interval_spin.blockSignals(False)
         self.break_duration_spin.blockSignals(False)
+        self.display_mode_combo.blockSignals(False)
     
     def _update_break_controls_enabled(self):
         """Update enabled state of break reminder controls based on checkbox."""
@@ -1062,6 +1117,12 @@ class SettingsWidget(QWidget):
     def _update_grouping_stats(self):
         """Update the grouping stats label after changes."""
         self.grouping_stats.setText(self._get_grouping_stats())
+        self.settings_changed.emit()
+    
+    def on_display_mode_changed(self, index):
+        """Handle display mode combo change."""
+        display_grouped = self.display_mode_combo.itemData(index)
+        self.config.screen_time_group_display = display_grouped
         self.settings_changed.emit()
     
 

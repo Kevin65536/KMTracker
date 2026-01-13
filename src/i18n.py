@@ -106,6 +106,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'screen_time.click_toggle_idle': 'Click chart to hide idle time',
         'screen_time.click_hide_idle': 'Click chart to hide idle time',
         'screen_time.click_show_idle': 'Click chart to show idle time',
+        'screen_time.group_productivity': 'Productivity',
+        'screen_time.group_other': 'Other',
+        'screen_time.group_unassigned': 'Unassigned',
         
         # Category filter
         'category.all': 'All Apps',
@@ -156,6 +159,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'settings.manage_groups': 'Manage app groups:',
         'settings.open_grouping': 'Open Grouping',
         'settings.grouping_stats': 'Productivity: {productivity} apps | Other: {other} apps',
+        
+        # Screen time display mode
+        'settings.screen_time_display': 'Screen Time Display',
+        'settings.screen_time_display_desc': 'Choose how to display applications on the Screen Time page.',
+        'settings.display_mode': 'Display mode:',
+        'settings.display_individual': 'Show individual applications',
+        'settings.display_grouped': 'Show category groups',
         
         # App grouping dialog
         'grouping.title': 'App Grouping',
@@ -316,6 +326,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'screen_time.click_toggle_idle': '点击图表隐藏空闲时间',
         'screen_time.click_hide_idle': '点击图表隐藏空闲时间',
         'screen_time.click_show_idle': '点击图表显示空闲时间',
+        'screen_time.group_productivity': '生产力',
+        'screen_time.group_other': '其他',
+        'screen_time.group_unassigned': '未分组',
         
         # Category filter
         'category.all': '全部应用',
@@ -366,6 +379,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'settings.manage_groups': '管理应用分组：',
         'settings.open_grouping': '打开分组',
         'settings.grouping_stats': '生产力：{productivity} 个应用 | 其他：{other} 个应用',
+        
+        # Screen time display mode
+        'settings.screen_time_display': '屏幕时间显示',
+        'settings.screen_time_display_desc': '选择在屏幕时间页面如何显示应用程序。',
+        'settings.display_mode': '显示模式：',
+        'settings.display_individual': '显示单个应用',
+        'settings.display_grouped': '显示分类分组',
         
         # App grouping dialog
         'grouping.title': '应用分组',

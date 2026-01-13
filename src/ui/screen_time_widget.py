@@ -325,9 +325,15 @@ class AppTimeTable(QWidget):
         self.table.setRowCount(len(app_data))
         
         for row, (app_name, seconds) in enumerate(app_data):
-            # Get friendly name - special handling for [Idle]
+            # Get friendly name - special handling for [Idle] and group entries
             if app_name == '[Idle]':
                 display_name = tr('screen_time.idle')
+            elif app_name == '[Group:productivity]':
+                display_name = tr('screen_time.group_productivity')
+            elif app_name == '[Group:other]':
+                display_name = tr('screen_time.group_other')
+            elif app_name == '[Group:unassigned]':
+                display_name = tr('screen_time.group_unassigned')
             elif app_name in self.metadata and self.metadata[app_name].get('friendly_name'):
                 display_name = self.metadata[app_name]['friendly_name']
             else:
@@ -338,6 +344,8 @@ class AppTimeTable(QWidget):
             # Style idle row differently
             if app_name == '[Idle]':
                 name_item.setForeground(QColor('#888888'))
+            elif app_name.startswith('[Group:'):
+                name_item.setForeground(QColor('#00e676'))  # Green for groups
             self.table.setItem(row, 0, name_item)
             
             # Time
@@ -345,6 +353,8 @@ class AppTimeTable(QWidget):
             time_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if app_name == '[Idle]':
                 time_item.setForeground(QColor('#888888'))
+            elif app_name.startswith('[Group:'):
+                time_item.setForeground(QColor('#00e676'))
             self.table.setItem(row, 1, time_item)
             
             # Percentage
@@ -353,6 +363,8 @@ class AppTimeTable(QWidget):
             pct_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if app_name == '[Idle]':
                 pct_item.setForeground(QColor('#888888'))
+            elif app_name.startswith('[Group:'):
+                pct_item.setForeground(QColor('#00e676'))
             self.table.setItem(row, 2, pct_item)
 
 
@@ -444,10 +456,22 @@ class AppTimePieChart(QWidget):
                 if seconds <= 0:
                     continue
                 
-                # Get friendly name - special handling for [Idle]
+                # Get friendly name - special handling for [Idle] and group entries
                 if app_name == '[Idle]':
                     display_name = tr('screen_time.idle')
                     color = QColor('#666666')  # Gray for idle
+                elif app_name == '[Group:productivity]':
+                    display_name = tr('screen_time.group_productivity')
+                    color = QColor('#00e676')  # Green for productivity
+                    color_index += 1
+                elif app_name == '[Group:other]':
+                    display_name = tr('screen_time.group_other')
+                    color = QColor('#ff9800')  # Orange for other
+                    color_index += 1
+                elif app_name == '[Group:unassigned]':
+                    display_name = tr('screen_time.group_unassigned')
+                    color = QColor('#9e9e9e')  # Gray for unassigned
+                    color_index += 1
                 else:
                     if app_name in self.metadata and self.metadata[app_name].get('friendly_name'):
                         display_name = self.metadata[app_name]['friendly_name']
@@ -654,6 +678,42 @@ class ScreenTimeWidget(QWidget):
             else:
                 active_app_data.append((app_name, seconds))
         
+        # Check if we should show grouped display
+        show_grouped = self.config.screen_time_group_display if self.config else False
+        
+        if show_grouped and self.config:
+            # Aggregate data by category groups
+            app_groups = self.config.app_groups
+            productivity_apps = set(app_groups.get('productivity', []))
+            other_apps = set(app_groups.get('other', []))
+            
+            productivity_seconds = 0
+            other_seconds = 0
+            unassigned_seconds = 0
+            
+            for app_name, seconds in active_app_data:
+                if app_name in productivity_apps:
+                    productivity_seconds += seconds
+                elif app_name in other_apps:
+                    other_seconds += seconds
+                else:
+                    unassigned_seconds += seconds
+            
+            # Build grouped display data
+            grouped_data = []
+            if productivity_seconds > 0:
+                grouped_data.append(('[Group:productivity]', productivity_seconds))
+            if other_seconds > 0:
+                grouped_data.append(('[Group:other]', other_seconds))
+            if unassigned_seconds > 0:
+                grouped_data.append(('[Group:unassigned]', unassigned_seconds))
+            
+            # Sort by time descending
+            grouped_data.sort(key=lambda x: x[1], reverse=True)
+            display_app_data = grouped_data
+        else:
+            display_app_data = active_app_data
+        
         # Calculate totals
         active_seconds = sum(s for _, s in active_app_data)
         total_seconds = active_seconds + idle_seconds
@@ -674,6 +734,7 @@ class ScreenTimeWidget(QWidget):
                 idle_seconds *= scale
                 total_seconds = max_total
                 active_app_data = [(app, seconds * scale) for app, seconds in active_app_data]
+                display_app_data = [(app, seconds * scale) for app, seconds in display_app_data]
         
         # Update cards based on time range
         self.total_time_card.update_value(total_seconds)
@@ -692,7 +753,7 @@ class ScreenTimeWidget(QWidget):
             avg_seconds = total_seconds / days if days > 0 else 0
             self.secondary_time_card.update_value(avg_seconds)
         
-        # Find top app (excluding idle)
+        # Find top app (excluding idle) - use original app data, not grouped
         if active_app_data:
             top_app_name = active_app_data[0][0]
             if top_app_name in metadata and metadata[top_app_name].get('friendly_name'):
@@ -704,10 +765,13 @@ class ScreenTimeWidget(QWidget):
             self.top_app_card.update_text(tr('screen_time.no_data'))
         
         # Include idle in display data (at the end)
-        display_data = active_app_data.copy()
+        display_data = list(display_app_data)
         if idle_seconds > 0:
             display_data.append(('[Idle]', idle_seconds))
         
+        # Calculate display total for percentage
+        display_total = sum(s for _, s in display_data)
+        
         # Update table and pie chart with all data including idle
-        self.app_table.update_data(display_data, total_seconds)
-        self.pie_chart.update_data(display_data, total_seconds)
+        self.app_table.update_data(display_data, display_total)
+        self.pie_chart.update_data(display_data, display_total)

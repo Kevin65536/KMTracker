@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
         'productivity': [],  # List of app names considered productive
         'other': [],  # List of app names considered other/leisure
     },
+    'screen_time_group_display': False,  # False = show individual apps, True = show category groups
 }
 
 CONFIG_FILE = 'config.json'
@@ -211,6 +212,17 @@ class Config:
     def app_groups(self, value):
         """Set app groups configuration."""
         self._config['app_groups'] = value
+        self.save()
+    
+    @property
+    def screen_time_group_display(self):
+        """Get screen time group display mode. False = individual apps, True = category groups."""
+        return self._config.get('screen_time_group_display', False)
+    
+    @screen_time_group_display.setter
+    def screen_time_group_display(self, value):
+        """Set screen time group display mode."""
+        self._config['screen_time_group_display'] = bool(value)
         self.save()
     
     def get_app_group(self, app_name):
